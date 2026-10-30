@@ -157,3 +157,54 @@ class PolicyEngine:
             ai_reasons=reasons_ai,
             ai_available=ai_available,
         )
+
+    def aggregate_session_decisions(
+        self,
+        session_id: str,
+        file_decisions: list[Decision],
+    ) -> Decision:
+        """Aggregate per-file decisions into a single session decision.
+
+        CLAUDE.md Section 7:
+        'Keputusan sesi = keputusan terparah di antara semua file
+        (satu file BLOCK = sesi BLOCK)'
+        Severity order: BLOCK > QUARANTINE > HUMAN_REVIEW > ALLOW.
+        """
+        if not file_decisions:
+            return self.evaluate_empty_session(session_id)
+
+        severity_rank: dict[str, int] = {
+            "BLOCK": 4,
+            "QUARANTINE": 3,
+            "HUMAN_REVIEW": 2,
+            "ALLOW": 1,
+        }
+
+        worst_decision = max(
+            file_decisions,
+            key=lambda d: severity_rank.get(d.action, 0),
+        )
+
+        all_det_reasons: list[str] = []
+        all_ai_reasons: list[str] = []
+        max_risk = 0.0
+        ai_available = any(d.ai_available for d in file_decisions)
+
+        for d in file_decisions:
+            max_risk = max(max_risk, d.risk)
+            for r in d.deterministic_reasons:
+                if r not in all_det_reasons:
+                    all_det_reasons.append(r)
+            for r in d.ai_reasons:
+                if r not in all_ai_reasons:
+                    all_ai_reasons.append(r)
+
+        return Decision(
+            session_id=session_id,
+            action=worst_decision.action,
+            risk=max_risk,
+            policy_version=self.config.version,
+            deterministic_reasons=all_det_reasons,
+            ai_reasons=all_ai_reasons,
+            ai_available=ai_available,
+        )
