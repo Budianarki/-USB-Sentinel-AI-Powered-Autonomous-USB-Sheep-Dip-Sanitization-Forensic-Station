@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "usb-sentinel"
+version = "0.1.0"
+description = "AI-Agent USB Sanitization Station (Sheep Dip Station)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "USB Sentinel Team" }
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "types-PyYAML>=6.0.0",
+    "hypothesis>=6.80.0",
+]
+iot = [
+    "pyudev>=0.24.0",
+    "gpiozero>=2.0",
+    "luma.oled>=3.12.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sentinel*", "gateway*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+markers = [
+    "linux_only: mark test as Linux-only (skipped on non-Linux platforms)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

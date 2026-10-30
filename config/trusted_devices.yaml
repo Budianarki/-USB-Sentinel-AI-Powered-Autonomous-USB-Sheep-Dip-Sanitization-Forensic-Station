@@ -1,0 +1,3 @@
+# Trusted USB Serial Numbers Whitelist
+trusted_serials: []
+blocked_serials: []

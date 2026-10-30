@@ -1,0 +1,39 @@
+# USB Sentinel Configuration
+mode: laptop_mock            # iot | laptop_mock
+
+gateway:
+  url: "https://gateway.local:8443"
+  device_token_env: SENTINEL_DEVICE_TOKEN
+  timeout_s: 20
+
+agents:
+  enabled: [static_analyst, intel, context, critic, responder]
+  always_ai: false
+  budget:
+    max_steps_per_file: 6
+    max_tokens_per_session: 30000
+    max_seconds_per_session: 90
+
+scan:
+  max_files: 5000
+  max_file_mb: 200
+  max_archive_depth: 3
+  max_decompress_ratio: 100
+  allowed_types: [pdf, docx, xlsx, pptx, txt, jpg, png, zip]
+
+policy:
+  file: config/policy.yaml
+  thresholds:
+    allow: 0.15
+    review: 0.40
+    block: 0.75
+
+usb:
+  allow_classes: [8] # 0x08 = Mass Storage
+  serial_whitelist_file: config/trusted_devices.yaml
+
+notify:
+  telegram:
+    enabled: false
+    chat_id_env: TG_CHAT_ID
+    token_env: TG_TOKEN

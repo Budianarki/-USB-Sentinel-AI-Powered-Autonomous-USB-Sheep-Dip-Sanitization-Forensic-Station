@@ -1,0 +1,32 @@
+# USB Sentinel - Layer 4 Policy Specification
+version: "1.0.0"
+
+thresholds:
+  allow: 0.15
+  review: 0.40
+  block: 0.75
+
+quarantine:
+  retention_days: 90
+  action_description: "Flashdisk ditahan petugas, tidak boleh dibawa masuk ruang server. Hanya hash dan metadata dicatat, file tidak disalin."
+
+# Deterministik weights / penalties for Layer 2 & Layer 4
+deterministic_risks:
+  av_hit: 1.0
+  yara_hit: 1.0
+  device_guard_violation: 1.0
+  mount_failure: 0.85
+  session_exception: 0.90
+  type_mismatch: 0.85
+  office_macro_autoexec: 0.90
+  pe_packed: 0.70
+  archive_encrypted: 0.60
+  script_detected: 0.65
+  untrusted_type: 0.50
+
+# Maximum risk contribution caps per agent in noisy-OR fusion
+agent_caps:
+  static_analyst: 0.85
+  intel: 0.90
+  context: 0.40
+  critic: 0.50
