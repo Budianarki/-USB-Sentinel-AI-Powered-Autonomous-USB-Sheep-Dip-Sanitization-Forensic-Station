@@ -53,12 +53,12 @@ class CritiqueResult(BaseModel):
     adjusted_risk_hint: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
-class Decision(BaseModel):
-    """Final session or file decision emitted by Policy Engine (Layer 4)."""
-    session_id: str
-    action: Literal["ALLOW", "QUARANTINE", "BLOCK", "HUMAN_REVIEW"]
-    risk: float = Field(ge=0.0, le=1.0)
-    policy_version: str
-    deterministic_reasons: list[str] = Field(default_factory=list)
-    ai_reasons: list[str] = Field(default_factory=list)
-    ai_available: bool = False
+from sentinel.policy.schemas import Decision
+
+__all__ = [
+    "AgentVerdict",
+    "CritiqueResult",
+    "Decision",
+    "FileFeatures",
+    "SessionContext",
+]

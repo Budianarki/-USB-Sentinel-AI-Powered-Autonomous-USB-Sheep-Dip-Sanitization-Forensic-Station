@@ -7,8 +7,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from sentinel.agents.schemas import Decision
 from sentinel.policy.engine import PolicyEngine
+from sentinel.policy.schemas import Decision
 from sentinel.util.config import PolicyConfig, PolicyThresholds
 
 
@@ -206,3 +206,74 @@ def test_property_hardware_or_av_hit_is_always_blocked(
         critic_disagreement=critic_disagree,
     )
     assert dec_av.action == "BLOCK"
+
+
+@given(
+    det_risk=st.floats(min_value=0.0, max_value=1.0),
+    ai_risk=st.floats(min_value=0.0, max_value=1.0),
+    ai_available=st.booleans(),
+    critic_disagree=st.booleans(),
+    scan_complete=st.booleans(),
+    scanners_ok=st.booleans(),
+    filesystem_supported=st.booleans(),
+)
+def test_property_scan_health_failure_never_yields_allow(
+    det_risk: float,
+    ai_risk: float,
+    ai_available: bool,
+    critic_disagree: bool,
+    scan_complete: bool,
+    scanners_ok: bool,
+    filesystem_supported: bool,
+) -> None:
+    """Property test: if scan_complete=False or scanners_ok=False or filesystem_supported=False,
+
+    the decision can NEVER be ALLOW across any combination of inputs.
+    """
+    if not (scan_complete and scanners_ok and filesystem_supported):
+        dec = DEFAULT_ENGINE.decide(
+            session_id="prop-health",
+            deterministic_risk=det_risk,
+            ai_risk=ai_risk,
+            ai_available=ai_available,
+            critic_disagreement=critic_disagree,
+            scan_complete=scan_complete,
+            scanners_ok=scanners_ok,
+            filesystem_supported=filesystem_supported,
+        )
+        assert dec.action != "ALLOW"
+
+
+def test_policy_engine_import_boundaries() -> None:
+    """Invariant 3 & 4: sentinel/policy must NEVER import agents or network libraries.
+
+    Policy Engine must remain 100% deterministic, offline, and independent of LLM agents.
+    """
+    import ast
+    from pathlib import Path
+
+    policy_dir = Path("sentinel/policy")
+    prohibited_prefixes = (
+        "agents",
+        "sentinel.agents",
+        "httpx",
+        "requests",
+        "socket",
+        "urllib",
+        "aiohttp",
+    )
+
+    for py_file in policy_dir.glob("*.py"):
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    for prohibited in prohibited_prefixes:
+                        assert not alias.name.startswith(prohibited), (
+                            f"Prohibited import '{alias.name}' in {py_file}"
+                        )
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                for prohibited in prohibited_prefixes:
+                    assert not node.module.startswith(prohibited), (
+                        f"Prohibited import-from '{node.module}' in {py_file}"
+                    )

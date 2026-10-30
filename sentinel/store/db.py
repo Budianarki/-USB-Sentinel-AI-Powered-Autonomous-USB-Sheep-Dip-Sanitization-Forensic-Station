@@ -16,6 +16,7 @@ def get_connection(db_path: Path | str) -> sqlite3.Connection:
     conn = sqlite3.connect(
         str(db_file),
         timeout=30.0,
+        isolation_level=None,  # Autocommit mode: explicit transactions with BEGIN IMMEDIATE
     )
     conn.row_factory = sqlite3.Row
 
@@ -28,11 +29,15 @@ def get_connection(db_path: Path | str) -> sqlite3.Connection:
 
 @contextmanager
 def db_session(db_path: Path | str) -> Generator[sqlite3.Connection, None, None]:
-    """Context manager for SQLite database operations with transactional safety."""
+    """Context manager for SQLite database operations with transactional safety (BEGIN IMMEDIATE)."""
     conn = get_connection(db_path)
     try:
-        with conn:
-            yield conn
+        conn.execute("BEGIN IMMEDIATE;")
+        yield conn
+        conn.execute("COMMIT;")
+    except Exception:
+        conn.execute("ROLLBACK;")
+        raise
     finally:
         conn.close()
 

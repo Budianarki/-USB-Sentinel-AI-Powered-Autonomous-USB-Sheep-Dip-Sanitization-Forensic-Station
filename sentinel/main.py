@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from sentinel.agents.schemas import Decision, SessionContext
+from sentinel.agents.schemas import SessionContext
 from sentinel.platform.base import (
     Display,
     DoorLock,
@@ -21,6 +21,7 @@ from sentinel.platform.display_console import ConsoleDisplay
 from sentinel.platform.gpio import MockDoorLock, MockIndicator, MockTamper
 from sentinel.platform.mock_usb import MockUsbSource
 from sentinel.policy.engine import PolicyEngine
+from sentinel.policy.schemas import Decision
 from sentinel.util.config import SentinelConfig, load_policy_config, load_sentinel_config
 
 SentinelState = Literal[

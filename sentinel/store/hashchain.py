@@ -71,8 +71,39 @@ def record_event(
         return event_id, this_hash
 
 
-def verify_hashchain(db_path: Path | str) -> tuple[bool, int, str | None]:
-    """Verify integrity of entire event log chain.
+def export_head(db_path: Path | str) -> tuple[int, str]:
+    """Export the current head state of the hash chain (count, head_hash).
+
+    Used for periodic off-device anchoring (e.g. sent to external syslog/SIEM/gateway)
+    to protect against undetected tail-truncation attacks.
+    """
+    db_file = Path(db_path)
+    if not db_file.exists():
+        return 0, GENESIS_PREV_HASH
+
+    with db_session(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, this_hash FROM events ORDER BY id DESC LIMIT 1;")
+        row = cursor.fetchone()
+        if row is None:
+            return 0, GENESIS_PREV_HASH
+        cursor.execute("SELECT COUNT(*) AS total FROM events;")
+        count_row = cursor.fetchone()
+        count = int(count_row["total"]) if count_row else 0
+        return count, row["this_hash"]
+
+
+def verify_hashchain(
+    db_path: Path | str,
+    expected_head: tuple[int, str] | None = None,
+) -> tuple[bool, int, str | None]:
+    """Verify integrity of event log chain.
+
+    Honest Security Note:
+    Without an external anchor (expected_head), deleting the N most recent events
+    (tail truncation) cannot be detected from internal cryptographic links alone,
+    because the remaining prefix forms a valid sub-chain. Passing an expected_head
+    (exported earlier off-device) guarantees detection of truncation.
 
     Returns:
         (is_valid: bool, verified_count: int, error_message: str | None)
@@ -89,6 +120,12 @@ def verify_hashchain(db_path: Path | str) -> tuple[bool, int, str | None]:
         rows = cursor.fetchall()
 
         if not rows:
+            if expected_head and expected_head[0] > 0:
+                return (
+                    False,
+                    0,
+                    f"Tail truncation detected: database has 0 events, but external anchor expected {expected_head[0]} events",
+                )
             return True, 0, None
 
         expected_prev_hash = GENESIS_PREV_HASH
@@ -123,6 +160,30 @@ def verify_hashchain(db_path: Path | str) -> tuple[bool, int, str | None]:
 
             expected_prev_hash = actual_this_hash
 
+        # 3. Optional external anchor verification against tail truncation
+        if expected_head is not None:
+            expected_count, expected_hash = expected_head
+            if len(rows) < expected_count:
+                return (
+                    False,
+                    len(rows),
+                    (
+                        f"Tail truncation detected: database has {len(rows)} events, but external anchor "
+                        f"expected at least {expected_count} events"
+                    ),
+                )
+            # Find the row at expected_count index
+            anchor_row = rows[expected_count - 1]
+            if anchor_row["this_hash"] != expected_hash:
+                return (
+                    False,
+                    expected_count,
+                    (
+                        f"External anchor mismatch at event id={expected_count}: expected '{expected_hash[:16]}...', "
+                        f"got '{anchor_row['this_hash'][:16]}...'"
+                    ),
+                )
+
         return True, len(rows), None
 
 
@@ -137,11 +198,27 @@ def verify_log_cli(argv: list[str] | None = None) -> int:
         default="data/sentinel.db",
         help="Path to SQLite database (default: data/sentinel.db)",
     )
+    parser.add_argument(
+        "--expected-count",
+        type=int,
+        default=None,
+        help="Optional expected event count from external anchor to detect tail truncation",
+    )
+    parser.add_argument(
+        "--expected-hash",
+        type=str,
+        default=None,
+        help="Optional expected head hash from external anchor",
+    )
     args = parser.parse_args(argv)
 
     db_path = Path(args.db)
+    expected_head = None
+    if args.expected_count is not None and args.expected_hash is not None:
+        expected_head = (args.expected_count, args.expected_hash)
+
     print(f"[*] Verifying hash chain integrity in: {db_path}...")
-    valid, count, err = verify_hashchain(db_path)
+    valid, count, err = verify_hashchain(db_path, expected_head=expected_head)
 
     if valid:
         print(f"[+] SUCCESS: Hash chain intact. {count} events verified without tampering.")

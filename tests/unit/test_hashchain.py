@@ -7,6 +7,7 @@ import pytest
 
 from sentinel.store.db import get_connection, init_database
 from sentinel.store.hashchain import (
+    export_head,
     record_event,
     verify_hashchain,
     verify_log_cli,
@@ -143,3 +144,48 @@ def test_verify_log_cli_exit_codes(db_path: Path) -> None:
 
     exit_code_tampered = verify_log_cli(["--db", str(db_path)])
     assert exit_code_tampered == 1
+
+
+def test_truncating_tail_undetected_without_external_anchor(db_path: Path) -> None:
+    """Security verification: deleting N tail events CANNOT be detected without an external anchor.
+
+    Because events 1..3 form an internally valid sub-chain, an attacker who truncates
+    the most recent events (e.g. to hide a recent incident) passes internal verification.
+    """
+    for i in range(1, 6):
+        record_event(db_path, f"EVENT_{i}", {"seq": i})
+
+    # Attacker truncates events 4 and 5
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("DELETE FROM events WHERE id >= 4;")
+    conn.commit()
+    conn.close()
+
+    # Internal verification passes (demonstrating need for external anchor)
+    valid_internal, count, err = verify_hashchain(db_path)
+    assert valid_internal is True
+    assert count == 3
+    assert err is None
+
+
+def test_truncating_tail_detected_with_external_anchor(db_path: Path) -> None:
+    """When an external anchor is provided, tail truncation is immediately detected."""
+    for i in range(1, 6):
+        record_event(db_path, f"EVENT_{i}", {"seq": i})
+
+    # Legitimate anchor exported earlier to external server/gateway
+    anchor = export_head(db_path)
+    assert anchor[0] == 5
+
+    # Attacker truncates events 4 and 5
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("DELETE FROM events WHERE id >= 4;")
+    conn.commit()
+    conn.close()
+
+    # Verification WITH anchor fails and flags truncation!
+    valid_anchored, count_detected, err = verify_hashchain(db_path, expected_head=anchor)
+    assert valid_anchored is False
+    assert count_detected == 3
+    assert err is not None
+    assert "Tail truncation detected" in err

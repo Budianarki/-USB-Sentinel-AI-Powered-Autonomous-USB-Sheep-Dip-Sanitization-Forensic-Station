@@ -6,7 +6,7 @@ No AI involvement, no hardcoded thresholds or risk numbers (Invariants 1, 2, 3).
 
 from typing import Literal
 
-from sentinel.agents.schemas import Decision
+from sentinel.policy.schemas import Decision
 from sentinel.util.config import PolicyConfig
 
 
@@ -91,6 +91,9 @@ class PolicyEngine:
         has_risky_type: bool = False,
         ai_available: bool = False,
         av_or_yara_hit: bool = False,
+        scan_complete: bool = True,
+        scanners_ok: bool = True,
+        filesystem_supported: bool = True,
         deterministic_reasons: list[str] | None = None,
         ai_reasons: list[str] | None = None,
     ) -> Decision:
@@ -98,8 +101,10 @@ class PolicyEngine:
 
         Invariants enforced:
         - Invariant 1: final_risk = max(deterministic_risk, ai_risk)
-        - Invariant 2: fail closed when AI is unavailable or risky type is unassessed
-        - Invariant 3: pure deterministic evaluation based on policy.yaml thresholds
+        - Invariant 2: fail closed when AI is unavailable, scan is incomplete,
+          scanners failed, or filesystem is unsupported.
+        - Invariant 3: pure deterministic evaluation based on policy.yaml thresholds.
+        ALLOW is emitted ONLY if scan_complete=True, scanners_ok=True, and filesystem_supported=True.
         """
         reasons_det = list(deterministic_reasons or [])
         reasons_ai = list(ai_reasons or [])
@@ -115,7 +120,7 @@ class PolicyEngine:
 
         action: Literal["ALLOW", "QUARANTINE", "BLOCK", "HUMAN_REVIEW"]
 
-        # Decision matrix from CLAUDE.md Section 7
+        # Decision matrix from CLAUDE.md Section 7 & Checkpoint 1A requirements
         if device_guard_blocked:
             action = "BLOCK"
             if not reasons_det:
@@ -135,11 +140,30 @@ class PolicyEngine:
             action = "HUMAN_REVIEW"
             if not reasons_det and not reasons_ai:
                 reasons_det.append(f"Risk score ({final_risk:.2f}) exceeds review threshold ({t_review})")
+        elif not scan_complete:
+            # Quota truncated, DoS limit hit, or unreadable file -> fail closed
+            action = "QUARANTINE"
+            reasons_det.append("Scan incomplete (quota truncated, DoS limit hit, or unreadable file; fail-closed)")
+        elif not scanners_ok:
+            # ClamAV or YARA offline / error -> fail closed
+            action = "QUARANTINE"
+            reasons_det.append("Security scanners offline or reported error (fail-closed)")
+        elif not filesystem_supported:
+            # Filesystem unsupported or partial mount -> fail closed
+            action = "QUARANTINE"
+            reasons_det.append("Filesystem unsupported or partial mount (fail-closed)")
         elif has_risky_type and not ai_available:
             # Invariant 2: Fail closed
             action = "QUARANTINE"
             reasons_det.append("Risky file type present but AI analyst unavailable (fail-closed)")
-        elif final_risk <= t_allow and deterministic_risk <= t_allow and not has_risky_type:
+        elif (
+            scan_complete
+            and scanners_ok
+            and filesystem_supported
+            and not has_risky_type
+            and final_risk <= t_allow
+            and deterministic_risk <= t_allow
+        ):
             action = "ALLOW"
             if not reasons_det:
                 reasons_det.append("All checks clean and risk within allowable threshold")
