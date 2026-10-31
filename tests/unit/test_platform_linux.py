@@ -15,11 +15,9 @@ from sentinel.platform.base import UsbDeviceDescriptor
 from sentinel.platform.linux_udev import LinuxUdevSource, PlatformNotSupportedError
 
 
-def test_linux_udev_on_non_linux_raises_error() -> None:
+def test_linux_udev_on_non_linux_raises_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """On non-Linux platforms (e.g. Windows), instantiating LinuxUdevSource must raise PlatformNotSupportedError."""
-    if sys.platform.startswith("linux"):
-        pytest.skip("Test specifically verifies error behavior on non-Linux platforms")
-
+    monkeypatch.setattr(sys, "platform", "win32")
     with pytest.raises(PlatformNotSupportedError) as exc_info:
         LinuxUdevSource()
 
