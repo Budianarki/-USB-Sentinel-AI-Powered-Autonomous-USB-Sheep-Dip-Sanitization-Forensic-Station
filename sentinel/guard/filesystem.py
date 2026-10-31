@@ -8,12 +8,15 @@ Enforces:
 
 from pathlib import Path
 
-SUPPORTED_FILESYSTEMS = {
+DEFAULT_ALLOWED_FILESYSTEMS = {
     "vfat",
     "fat",
     "fat32",
     "fat16",
     "exfat",
+}
+
+EXTENDED_FILESYSTEMS = {
     "ext2",
     "ext3",
     "ext4",
@@ -21,13 +24,35 @@ SUPPORTED_FILESYSTEMS = {
     "iso9660",
 }
 
+# Full known set for reference and backward compatibility
+SUPPORTED_FILESYSTEMS = DEFAULT_ALLOWED_FILESYSTEMS | EXTENDED_FILESYSTEMS
 
-def is_filesystem_supported(fstype: str | None) -> bool:
-    """Validate whether detected filesystem is on the approved whitelist."""
+
+def is_filesystem_supported(
+    fstype: str | None,
+    allowed_filesystems: list[str] | set[str] | None = None,
+) -> bool:
+    """Validate whether detected filesystem is on the approved whitelist.
+
+    By default, only simple flashdisk filesystems (vfat, exfat) are permitted.
+    Complex filesystems like ntfs and ext4 must be explicitly enabled in config
+    due to host kernel filesystem parser attack surfaces.
+    """
     if not fstype:
         return False
     clean = fstype.strip().lower()
-    return clean in SUPPORTED_FILESYSTEMS
+
+    if allowed_filesystems is None:
+        target_whitelist = DEFAULT_ALLOWED_FILESYSTEMS
+    else:
+        target_whitelist = set()
+        for item in allowed_filesystems:
+            norm = item.strip().lower()
+            target_whitelist.add(norm)
+            if norm == "vfat":
+                target_whitelist.update({"fat", "fat32", "fat16"})
+
+    return clean in target_whitelist
 
 
 def validate_path_safety(path: Path, mount_point: Path) -> tuple[bool, list[str]]:

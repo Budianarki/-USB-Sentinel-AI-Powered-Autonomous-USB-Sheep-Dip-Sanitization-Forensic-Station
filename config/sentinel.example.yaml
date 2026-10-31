@@ -17,9 +17,14 @@ agents:
 scan:
   max_files: 5000
   max_file_mb: 200
+  max_static_analysis_mb: 50   # Max size for RAM temporary copy during static analysis
   max_archive_depth: 3
   max_decompress_ratio: 100
   allowed_types: [pdf, docx, xlsx, pptx, txt, jpg, png, zip]
+  # Filesystem whitelist: default is vfat and exfat only.
+  # WARNING: Enabling ntfs or ext4 increases host attack surface because complex
+  # kernel filesystem drivers may contain memory corruption vulnerabilities.
+  allowed_filesystems: [vfat, exfat]
 
 policy:
   file: config/policy.yaml

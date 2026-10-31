@@ -103,7 +103,8 @@ class ScanEngine:
                 reasons.append(f"YARA scanner offline or error: {self.yara.init_error}")
 
         # 2. Filesystem whitelist check
-        fs_ok = is_filesystem_supported(filesystem_type)
+        allowed_fs = getattr(self.config.scan, "allowed_filesystems", None)
+        fs_ok = is_filesystem_supported(filesystem_type, allowed_filesystems=allowed_fs)
         if not fs_ok:
             reasons.append(
                 f"Filesystem type '{filesystem_type}' not supported on security whitelist"
@@ -233,7 +234,19 @@ class ScanEngine:
                     ext_mismatch = False
                     entropy = 0.0
 
-                    if stream_res.temp_path and stream_res.temp_path.exists():
+                    max_static_mb = getattr(self.config.scan, "max_static_analysis_mb", 50)
+                    max_static_bytes = max_static_mb * 1024 * 1024
+
+                    if stream_res.size > max_static_bytes:
+                        file_flags.append("static_analysis_size_exceeded")
+                        scan_complete = False
+                        file_risk = max(file_risk, 0.75)
+                        reasons.append(
+                            f"File '{name_res.sanitized_name}' ({stream_res.size / (1024*1024):.1f}MB) "
+                            f"exceeds maximum static analysis limit ({max_static_mb}MB); "
+                            "static analysis skipped (fail-closed to quarantine)"
+                        )
+                    elif stream_res.temp_path and stream_res.temp_path.exists():
                         # Read sample for YARA scan
                         sample_data = stream_res.temp_path.read_bytes()
                         yara_res = self.yara.scan_data(sample_data)

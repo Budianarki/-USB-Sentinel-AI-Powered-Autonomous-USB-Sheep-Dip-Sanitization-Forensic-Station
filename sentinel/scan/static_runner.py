@@ -17,17 +17,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def _linux_limits() -> None:
-    """Apply resource constraints on Linux to prevent DoS via decompression bombs or regex hangs."""
-    try:
-        import resource  # type: ignore[import-not-found]
+def make_linux_limits(
+    mem_limit_bytes: int = 512 * 1024 * 1024,
+    cpu_limit_s: int = 5,
+) -> Any:
+    """Create preexec function applying setrlimit constraints on Linux."""
+    def _apply() -> None:
+        try:
+            import resource  # type: ignore[import-not-found]
 
-        # RLIMIT_CPU: limit CPU time to 5 seconds
-        resource.setrlimit(resource.RLIMIT_CPU, (5, 5))  # type: ignore[attr-defined]
-        # RLIMIT_AS: limit address space to 512 MB
-        resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))  # type: ignore[attr-defined]
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("Failed setting resource limits: %s", exc)
+            # RLIMIT_CPU: limit CPU time
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit_s, cpu_limit_s))  # type: ignore[attr-defined]
+            # RLIMIT_AS: limit virtual address space
+            resource.setrlimit(resource.RLIMIT_AS, (mem_limit_bytes, mem_limit_bytes))  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Failed setting resource limits: %s", exc)
+    return _apply
 
 
 @dataclass
@@ -44,8 +49,15 @@ class IsolatedStaticResult:
 class IsolatedStaticRunner:
     """Supervises isolated worker subprocesses for static analysis."""
 
-    def __init__(self, timeout_s: float = 5.0) -> None:
+    def __init__(
+        self,
+        timeout_s: float = 5.0,
+        mem_limit_bytes: int = 512 * 1024 * 1024,
+        cpu_limit_s: int = 5,
+    ) -> None:
         self.timeout_s = timeout_s
+        self.mem_limit_bytes = mem_limit_bytes
+        self.cpu_limit_s = cpu_limit_s
 
     def run_analysis(
         self,
@@ -66,7 +78,11 @@ class IsolatedStaticRunner:
             original_filename,
         ]
 
-        preexec = _linux_limits if sys.platform.startswith("linux") else None
+        preexec = (
+            make_linux_limits(self.mem_limit_bytes, self.cpu_limit_s)
+            if sys.platform.startswith("linux")
+            else None
+        )
 
         try:
             proc = subprocess.run(

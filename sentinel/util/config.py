@@ -36,10 +36,14 @@ class AgentsConfig(BaseModel):
 class ScanConfig(BaseModel):
     max_files: int = Field(default=5000, ge=1)
     max_file_mb: int = Field(default=200, ge=1)
+    max_static_analysis_mb: int = Field(default=50, ge=1)
     max_archive_depth: int = Field(default=3, ge=0)
     max_decompress_ratio: float = Field(default=100.0, ge=1.0)
     allowed_types: list[str] = Field(
         default_factory=lambda: ["pdf", "docx", "xlsx", "pptx", "txt", "jpg", "png", "zip"]
+    )
+    allowed_filesystems: list[str] = Field(
+        default_factory=lambda: ["vfat", "exfat"]
     )
 
 
