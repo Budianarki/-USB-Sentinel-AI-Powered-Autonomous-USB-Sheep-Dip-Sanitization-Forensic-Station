@@ -53,7 +53,9 @@ class PolicyThresholds(BaseModel):
     def validate_review(cls, v: float, info: Any) -> float:
         allow = info.data.get("allow", 0.15)
         if v < allow:
-            raise ValueError(f"review threshold ({v}) cannot be less than allow threshold ({allow})")
+            raise ValueError(
+                f"review threshold ({v}) cannot be less than allow threshold ({allow})"
+            )
         return v
 
     @field_validator("block")
@@ -61,7 +63,9 @@ class PolicyThresholds(BaseModel):
     def validate_block(cls, v: float, info: Any) -> float:
         review = info.data.get("review", 0.40)
         if v < review:
-            raise ValueError(f"block threshold ({v}) cannot be less than review threshold ({review})")
+            raise ValueError(
+                f"block threshold ({v}) cannot be less than review threshold ({review})"
+            )
         return v
 
 

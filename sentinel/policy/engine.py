@@ -84,6 +84,10 @@ class PolicyEngine:
     def decide(
         self,
         session_id: str,
+        *,
+        scan_complete: bool,
+        scanners_ok: bool,
+        filesystem_supported: bool,
         device_guard_blocked: bool = False,
         deterministic_risk: float = 0.0,
         ai_risk: float | None = None,
@@ -91,9 +95,6 @@ class PolicyEngine:
         has_risky_type: bool = False,
         ai_available: bool = False,
         av_or_yara_hit: bool = False,
-        scan_complete: bool = True,
-        scanners_ok: bool = True,
-        filesystem_supported: bool = True,
         deterministic_reasons: list[str] | None = None,
         ai_reasons: list[str] | None = None,
     ) -> Decision:
@@ -120,7 +121,7 @@ class PolicyEngine:
 
         action: Literal["ALLOW", "QUARANTINE", "BLOCK", "HUMAN_REVIEW"]
 
-        # Decision matrix from CLAUDE.md Section 7 & Checkpoint 1A requirements
+        # Decision matrix from CLAUDE.md Section 7 & Checkpoint 1A/1B requirements
         if device_guard_blocked:
             action = "BLOCK"
             if not reasons_det:
@@ -129,21 +130,12 @@ class PolicyEngine:
             action = "BLOCK"
             if not reasons_det:
                 reasons_det.append("Antivirus or YARA signature hit")
-        elif final_risk >= t_block:
-            action = "BLOCK"
-            if not reasons_det and not reasons_ai:
-                reasons_det.append(f"Risk score ({final_risk:.2f}) exceeds block threshold ({t_block})")
-        elif critic_disagreement:
-            action = "HUMAN_REVIEW"
-            reasons_det.append("Critic agent disagreed with analysis verdict; escalating to human review")
-        elif final_risk >= t_review:
-            action = "HUMAN_REVIEW"
-            if not reasons_det and not reasons_ai:
-                reasons_det.append(f"Risk score ({final_risk:.2f}) exceeds review threshold ({t_review})")
         elif not scan_complete:
-            # Quota truncated, DoS limit hit, or unreadable file -> fail closed
+            # Quota truncated, DoS limit hit, TOCTOU mismatch, or unreadable file -> fail closed
             action = "QUARANTINE"
-            reasons_det.append("Scan incomplete (quota truncated, DoS limit hit, or unreadable file; fail-closed)")
+            reasons_det.append(
+                "Scan incomplete (quota truncated, DoS limit hit, or unreadable file; fail-closed)"
+            )
         elif not scanners_ok:
             # ClamAV or YARA offline / error -> fail closed
             action = "QUARANTINE"
@@ -152,6 +144,23 @@ class PolicyEngine:
             # Filesystem unsupported or partial mount -> fail closed
             action = "QUARANTINE"
             reasons_det.append("Filesystem unsupported or partial mount (fail-closed)")
+        elif final_risk >= t_block:
+            action = "BLOCK"
+            if not reasons_det and not reasons_ai:
+                reasons_det.append(
+                    f"Risk score ({final_risk:.2f}) exceeds block threshold ({t_block})"
+                )
+        elif critic_disagreement:
+            action = "HUMAN_REVIEW"
+            reasons_det.append(
+                "Critic agent disagreed with analysis verdict; escalating to human review"
+            )
+        elif final_risk >= t_review:
+            action = "HUMAN_REVIEW"
+            if not reasons_det and not reasons_ai:
+                reasons_det.append(
+                    f"Risk score ({final_risk:.2f}) exceeds review threshold ({t_review})"
+                )
         elif has_risky_type and not ai_available:
             # Invariant 2: Fail closed
             action = "QUARANTINE"

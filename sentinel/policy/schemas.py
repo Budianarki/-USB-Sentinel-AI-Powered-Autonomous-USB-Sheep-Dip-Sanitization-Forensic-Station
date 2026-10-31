@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class Decision(BaseModel):
     """Final session or file decision emitted by Policy Engine (Layer 4)."""
+
     session_id: str
     action: Literal["ALLOW", "QUARANTINE", "BLOCK", "HUMAN_REVIEW"]
     risk: float = Field(ge=0.0, le=1.0)

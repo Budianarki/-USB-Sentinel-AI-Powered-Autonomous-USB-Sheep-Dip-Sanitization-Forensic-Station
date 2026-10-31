@@ -79,7 +79,7 @@ def test_tampering_payload_fails_verification(db_path: Path) -> None:
     # Tamper with row 2 payload: change 'BLOCK' to 'ALLOW' directly in SQLite!
     conn = sqlite3.connect(str(db_path))
     conn.execute(
-        "UPDATE events SET payload_json = '{\"action\":\"ALLOW\",\"reason\":\"Faked\"}' WHERE id = 2;"
+        'UPDATE events SET payload_json = \'{"action":"ALLOW","reason":"Faked"}\' WHERE id = 2;'
     )
     conn.commit()
     conn.close()

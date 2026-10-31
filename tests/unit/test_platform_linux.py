@@ -92,7 +92,9 @@ async def test_linux_mount_executes_hardened_flags_via_mock_subprocess(
 
 
 @pytest.mark.linux_only
-@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux-only test: requires udev and root mount")
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"), reason="Linux-only test: requires udev and root mount"
+)
 def test_linux_udev_initialization_on_linux() -> None:
     """Verify LinuxUdevSource initialization on Linux."""
     source = LinuxUdevSource()

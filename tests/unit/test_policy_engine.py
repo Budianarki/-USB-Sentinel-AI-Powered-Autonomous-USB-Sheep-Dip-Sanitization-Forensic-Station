@@ -28,6 +28,9 @@ def test_device_guard_blocked_yields_block(policy_engine: PolicyEngine) -> None:
     """Device guard violation must always produce BLOCK with alarm severity."""
     dec = policy_engine.decide(
         session_id="test-1",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         device_guard_blocked=True,
         deterministic_risk=0.0,
     )
@@ -39,6 +42,9 @@ def test_av_or_yara_hit_yields_block(policy_engine: PolicyEngine) -> None:
     """AV or YARA hit must always produce BLOCK."""
     dec = policy_engine.decide(
         session_id="test-2",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         av_or_yara_hit=True,
         deterministic_risk=0.1,
     )
@@ -50,6 +56,9 @@ def test_high_risk_yields_block(policy_engine: PolicyEngine) -> None:
     """Risk at or above block threshold (0.75) must produce BLOCK."""
     dec = policy_engine.decide(
         session_id="test-3",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=0.75,
     )
     assert dec.action == "BLOCK"
@@ -59,6 +68,9 @@ def test_critic_disagreement_escalates_to_human_review(policy_engine: PolicyEngi
     """Critic disagreement must escalate to HUMAN_REVIEW even if risk is below review threshold."""
     dec = policy_engine.decide(
         session_id="test-4",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=0.20,
         critic_disagreement=True,
     )
@@ -70,6 +82,9 @@ def test_moderate_risk_yields_human_review(policy_engine: PolicyEngine) -> None:
     """Risk at or above review threshold (0.40) must produce HUMAN_REVIEW."""
     dec = policy_engine.decide(
         session_id="test-5",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=0.50,
     )
     assert dec.action == "HUMAN_REVIEW"
@@ -79,6 +94,9 @@ def test_risky_type_ai_unavailable_fails_closed_to_quarantine(policy_engine: Pol
     """Invariant 2: Risky file type when AI is unavailable must fail-closed to QUARANTINE."""
     dec = policy_engine.decide(
         session_id="test-6",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=0.10,
         has_risky_type=True,
         ai_available=False,
@@ -91,6 +109,9 @@ def test_clean_session_yields_allow(policy_engine: PolicyEngine) -> None:
     """Low risk and no risky types must produce ALLOW."""
     dec = policy_engine.decide(
         session_id="test-7",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=0.05,
         ai_risk=0.05,
         ai_available=True,
@@ -99,17 +120,18 @@ def test_clean_session_yields_allow(policy_engine: PolicyEngine) -> None:
     assert dec.action == "ALLOW"
 
 
+def test_mandatory_scan_parameters_enforced(policy_engine: PolicyEngine) -> None:
+    """scan_complete, scanners_ok, filesystem_supported must be required keyword-only args."""
+    with pytest.raises(TypeError):
+        # Missing required keyword arguments
+        policy_engine.decide("test-missing")  # type: ignore[call-arg]
+
+
 def test_aggregate_session_decisions_worst_case(policy_engine: PolicyEngine) -> None:
     """Session decision must reflect the worst decision across all files."""
-    d_allow = Decision(
-        session_id="s1", action="ALLOW", risk=0.05, policy_version="1.0.0"
-    )
-    d_quarantine = Decision(
-        session_id="s1", action="QUARANTINE", risk=0.60, policy_version="1.0.0"
-    )
-    d_block = Decision(
-        session_id="s1", action="BLOCK", risk=0.95, policy_version="1.0.0"
-    )
+    d_allow = Decision(session_id="s1", action="ALLOW", risk=0.05, policy_version="1.0.0")
+    d_quarantine = Decision(session_id="s1", action="QUARANTINE", risk=0.60, policy_version="1.0.0")
+    d_block = Decision(session_id="s1", action="BLOCK", risk=0.95, policy_version="1.0.0")
 
     # Allow + Quarantine -> Quarantine
     res1 = policy_engine.aggregate_session_decisions("s1", [d_allow, d_quarantine])
@@ -146,6 +168,9 @@ def test_property_invariant_1_monotonic_escalation(
     """Invariant 1: final_risk must ALWAYS be >= deterministic_risk for all inputs."""
     dec = DEFAULT_ENGINE.decide(
         session_id="prop-1",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=det_risk,
         ai_risk=ai_risk,
         ai_available=ai_available,
@@ -165,6 +190,9 @@ def test_property_invariant_2_fail_closed_on_risky_type(
     """Invariant 2: When risky type exists and AI is unavailable, action CANNOT be ALLOW."""
     dec = DEFAULT_ENGINE.decide(
         session_id="prop-2",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         deterministic_risk=det_risk,
         ai_risk=ai_risk,
         has_risky_type=True,
@@ -189,6 +217,9 @@ def test_property_hardware_or_av_hit_is_always_blocked(
     """Device guard violation or AV hit must ALWAYS result in BLOCK."""
     dec_guard = DEFAULT_ENGINE.decide(
         session_id="prop-3a",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         device_guard_blocked=True,
         deterministic_risk=det_risk,
         ai_risk=ai_risk,
@@ -199,6 +230,9 @@ def test_property_hardware_or_av_hit_is_always_blocked(
 
     dec_av = DEFAULT_ENGINE.decide(
         session_id="prop-3b",
+        scan_complete=True,
+        scanners_ok=True,
+        filesystem_supported=True,
         av_or_yara_hit=True,
         deterministic_risk=det_risk,
         ai_risk=ai_risk,

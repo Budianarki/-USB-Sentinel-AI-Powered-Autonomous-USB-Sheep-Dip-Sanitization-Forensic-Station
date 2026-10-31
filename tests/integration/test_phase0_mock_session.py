@@ -13,7 +13,9 @@ from sentinel.util.config import SentinelConfig
 
 
 @pytest.fixture
-def station(tmp_path: Path) -> tuple[SentinelStation, MockUsbSource, ConsoleDisplay, MockIndicator, MockTamper]:
+def station(
+    tmp_path: Path,
+) -> tuple[SentinelStation, MockUsbSource, ConsoleDisplay, MockIndicator, MockTamper]:
     config = SentinelConfig(mode="laptop_mock")
     usb_source = MockUsbSource(default_mount_dir=tmp_path)
     display = ConsoleDisplay(silent=True)
@@ -65,7 +67,7 @@ async def test_empty_usb_session_allow(
     # Verify indicator and display
     assert indicator.current_state == "green"
     assert "success" in indicator.beep_history
-    assert display.current_status == "ALLOWED"
+    assert display.current_status == "[MOCK] ALLOWED"
 
 
 @pytest.mark.asyncio
@@ -96,7 +98,7 @@ async def test_badusb_hid_blocked_in_guard(
     assert stn.state == "IDLE"
     assert indicator.current_state == "red"
     assert "alarm" in indicator.beep_history
-    assert display.current_status == "BLOCKED"
+    assert display.current_status == "[MOCK] BLOCKED"
 
 
 @pytest.mark.asyncio
@@ -120,7 +122,7 @@ async def test_second_insertion_rejected_with_alarm(
 
     assert decision is None
     assert "alarm" in indicator.beep_history
-    assert display.current_status == "REJECTED"
+    assert display.current_status == "[MOCK] REJECTED"
 
 
 @pytest.mark.asyncio
@@ -146,7 +148,7 @@ async def test_forced_unplug_aborts_session(
     assert stn.state == "IDLE"
     assert stn.active_device is None
     assert "alarm" in indicator.beep_history
-    assert display.current_status == "ABORTED"
+    assert display.current_status == "[MOCK] ABORTED"
 
 
 def test_tamper_switch_triggers_alarm(
@@ -158,4 +160,4 @@ def test_tamper_switch_triggers_alarm(
     tamper.trigger()
     assert indicator.current_state == "red"
     assert "alarm" in indicator.beep_history
-    assert display.current_status == "SECURITY ALERT"
+    assert display.current_status == "[MOCK] SECURITY ALERT"

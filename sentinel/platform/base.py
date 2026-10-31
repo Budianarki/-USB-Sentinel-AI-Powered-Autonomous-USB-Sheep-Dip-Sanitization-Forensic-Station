@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 class UsbDeviceDescriptor(BaseModel):
     """Metadata describing a detected USB device."""
+
     device_id: str
     vendor_id: str = "0000"
     product_id: str = "0000"
@@ -30,6 +31,7 @@ class UsbDeviceDescriptor(BaseModel):
 
 class UsbEvent(BaseModel):
     """Event emitted when a USB device is plugged in or removed."""
+
     event_type: Literal["CONNECT", "DISCONNECT"]
     device: UsbDeviceDescriptor
     timestamp: float
@@ -37,6 +39,7 @@ class UsbEvent(BaseModel):
 
 class MountResult(BaseModel):
     """Result of mounting a USB device partition."""
+
     success: bool
     mount_point: Path | None = None
     error_message: str | None = None

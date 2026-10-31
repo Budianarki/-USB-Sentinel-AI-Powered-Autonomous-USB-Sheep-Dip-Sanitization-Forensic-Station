@@ -22,6 +22,7 @@ from sentinel.platform.gpio import MockDoorLock, MockIndicator, MockTamper
 from sentinel.platform.mock_usb import MockUsbSource
 from sentinel.policy.engine import PolicyEngine
 from sentinel.policy.schemas import Decision
+from sentinel.scan.engine import ScanEngine
 from sentinel.util.config import SentinelConfig, load_policy_config, load_sentinel_config
 
 SentinelState = Literal[
@@ -54,6 +55,7 @@ class SentinelStation:
         tamper: Tamper | None = None,
         door_lock: DoorLock | None = None,
         policy_engine: PolicyEngine | None = None,
+        scan_engine: ScanEngine | None = None,
     ) -> None:
         self.config = config
         self.usb_source = usb_source
@@ -61,8 +63,10 @@ class SentinelStation:
         self.indicator = indicator
         self.tamper = tamper or MockTamper()
         self.door_lock = door_lock or MockDoorLock()
-        self.policy_engine = policy_engine or PolicyEngine(
-            load_policy_config(config.policy.file)
+        self.policy_engine = policy_engine or PolicyEngine(load_policy_config(config.policy.file))
+        self.scan_engine = scan_engine or ScanEngine(
+            config=self.config,
+            policy_config=self.policy_engine.config,
         )
 
         self.state: SentinelState = "IDLE"
@@ -76,9 +80,12 @@ class SentinelStation:
 
     def _handle_tamper_event(self) -> None:
         """Immediate physical tamper response."""
+        prefix = "[MOCK] " if self.config.mode == "laptop_mock" else ""
         self.indicator.set_state("red")
         self.indicator.beep("alarm")
-        self.display.show("SECURITY ALERT", ["Chassis tamper detected!", "Station locked down."])
+        self.display.show(
+            f"{prefix}SECURITY ALERT", [f"{prefix}Chassis tamper detected!", "Station locked down."]
+        )
 
     def _calculate_fingerprint(self, dev: UsbDeviceDescriptor) -> str:
         """Calculate SHA256(vid || pid || serial)."""
@@ -87,14 +94,15 @@ class SentinelStation:
 
     async def handle_usb_event(self, event: UsbEvent) -> Decision | None:
         """Process incoming USB connect/disconnect event through state machine."""
+        prefix = "[MOCK] " if self.config.mode == "laptop_mock" else ""
         async with self._lock:
             if event.event_type == "CONNECT":
                 # Rule: Only one active USB session at a time. Reject second insertion with alarm.
                 if self.state != "IDLE":
                     self.indicator.beep("alarm")
                     self.display.show(
-                        "REJECTED",
-                        ["Colokan kedua ditolak!", "Sesi lain sedang aktif."],
+                        f"{prefix}REJECTED",
+                        [f"{prefix}Colokan kedua ditolak!", "Sesi lain sedang aktif."],
                     )
                     return None
 
@@ -111,8 +119,8 @@ class SentinelStation:
                     self.indicator.set_state("red")
                     self.indicator.beep("alarm")
                     self.display.show(
-                        "ABORTED",
-                        ["Perangkat dicabut paksa!", "Pemeriksaan dibatalkan."],
+                        f"{prefix}ABORTED",
+                        [f"{prefix}Perangkat dicabut paksa!", "Pemeriksaan dibatalkan."],
                     )
                     await self.usb_source.unmount(event.device)
                     self.active_device = None
@@ -141,14 +149,17 @@ class SentinelStation:
             # 1. DEVICE_DETECTED
             self.state = "DEVICE_DETECTED"
             self.indicator.set_state("yellow")
-            self.display.show("DETECTED", [f"Serial: {device.serial_number[:16]}", "Checking class..."])
+            self.display.show(
+                "DETECTED", [f"Serial: {device.serial_number[:16]}", "Checking class..."]
+            )
 
             # 2. GUARD_CHECK (Layer 1)
             self.state = "GUARD_CHECK"
             # Rule: Only allowed classes permitted (default 0x08 Mass Storage).
             # If any HID (0x03) or unallowed class is found -> BLOCK immediately.
             disallowed = [
-                cls_id for cls_id in device.interface_classes
+                cls_id
+                for cls_id in device.interface_classes
                 if cls_id not in self.config.usb.allow_classes
             ]
             if disallowed or (0x03 in device.interface_classes):
@@ -174,24 +185,36 @@ class SentinelStation:
 
             # 4. SCANNING (Layer 2)
             self.state = "SCANNING"
-            self.display.show("SCANNING", ["Enumerating files..."])
+            scan_header = "[MOCK] SCANNING" if self.config.mode == "laptop_mock" else "SCANNING"
+            self.display.show(scan_header, ["Pemeriksaan file deterministik..."])
             mount_path = Path(mount_res.mount_point)
 
-            # In Phase 0: minimal scanning loop (checks if folder exists and lists files)
-            files = list(mount_path.rglob("*")) if mount_path.exists() else []
-            regular_files = [f for f in files if f.is_file()]
+            scan_res = self.scan_engine.scan_mount(
+                mount_point=mount_path,
+                filesystem_type=getattr(mount_res, "filesystem_type", "vfat"),
+            )
 
             # 5. DECIDING (Layer 4)
             self.state = "DECIDING"
-            if len(regular_files) == 0:
+            if (
+                len(scan_res.file_features) == 0
+                and scan_res.scan_complete
+                and scan_res.scanners_ok
+                and scan_res.filesystem_supported
+                and scan_res.deterministic_risk == 0.0
+            ):
                 # Empty session clean allow
                 decision = self.policy_engine.evaluate_empty_session(session_id=session_id)
             else:
-                # Basic files check
                 decision = self.policy_engine.decide(
                     session_id=session_id,
-                    deterministic_risk=0.0,
-                    deterministic_reasons=[f"Phase 0 basic check passed ({len(regular_files)} files)"],
+                    scan_complete=scan_res.scan_complete,
+                    scanners_ok=scan_res.scanners_ok,
+                    filesystem_supported=scan_res.filesystem_supported,
+                    deterministic_risk=scan_res.deterministic_risk,
+                    has_risky_type=scan_res.has_risky_type,
+                    av_or_yara_hit=scan_res.av_or_yara_hit,
+                    deterministic_reasons=scan_res.deterministic_reasons,
                 )
 
             await self._report_and_cleanup(device, decision)
@@ -214,34 +237,35 @@ class SentinelStation:
         """Transition through REPORTING and UNMOUNT back to IDLE."""
         self.state = "REPORTING"
         self.last_decision = decision
+        prefix = "[MOCK] " if self.config.mode == "laptop_mock" else ""
 
         if decision.action == "ALLOW":
             self.indicator.set_state("green")
             self.indicator.beep("success")
             self.display.show(
-                "ALLOWED",
-                ["Pemeriksaan berhasil bersih.", "Silakan cabut flashdisk."],
+                f"{prefix}ALLOWED",
+                [f"{prefix}Pemeriksaan berhasil bersih.", "Silakan cabut flashdisk."],
             )
         elif decision.action == "BLOCK":
             self.indicator.set_state("red")
             self.indicator.beep("alarm")
             self.display.show(
-                "BLOCKED",
-                ["PERANGKAT BERBAHAYA!", "Jangan bawa masuk ke ruang server."],
+                f"{prefix}BLOCKED",
+                [f"{prefix}PERANGKAT BERBAHAYA!", "Jangan bawa masuk ke ruang server."],
             )
         elif decision.action == "QUARANTINE":
             self.indicator.set_state("yellow")
             self.indicator.beep("warning")
             self.display.show(
-                "QUARANTINE",
-                ["Flashdisk berisiko ditahan petugas.", "Menunggu verifikasi lanjutan."],
+                f"{prefix}QUARANTINE",
+                [f"{prefix}Flashdisk berisiko ditahan petugas.", "Menunggu verifikasi lanjutan."],
             )
         else:  # HUMAN_REVIEW
             self.indicator.set_state("yellow")
             self.indicator.beep("warning")
             self.display.show(
-                "REVIEW",
-                ["Menunggu persetujuan analis.", "Jangan cabut flashdisk."],
+                f"{prefix}REVIEW",
+                [f"{prefix}Menunggu persetujuan analis.", "Jangan cabut flashdisk."],
             )
 
         # UNMOUNT
@@ -272,6 +296,7 @@ def create_station(config_path: str | Path | None = None) -> SentinelStation:
     else:
         # IoT mode (Linux)
         from sentinel.platform.linux_udev import LinuxUdevSource
+
         usb_source = LinuxUdevSource()
         display = ConsoleDisplay()
         indicator = MockIndicator()
