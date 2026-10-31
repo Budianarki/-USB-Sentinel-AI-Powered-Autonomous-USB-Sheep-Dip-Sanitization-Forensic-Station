@@ -47,6 +47,8 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 markers = [
     "linux_only: mark test as Linux-only (skipped on non-Linux platforms)",
+    "needs_clamd: mark test as requiring a running clamd daemon (clamav-daemon)",
+    "needs_root: mark test as requiring root/sudo privileges (e.g. loop mounting)",
 ]
 
 [tool.ruff]

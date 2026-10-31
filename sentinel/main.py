@@ -56,6 +56,7 @@ class SentinelStation:
         door_lock: DoorLock | None = None,
         policy_engine: PolicyEngine | None = None,
         scan_engine: ScanEngine | None = None,
+        db_path: Path | str | None = None,
     ) -> None:
         self.config = config
         self.usb_source = usb_source
@@ -68,6 +69,11 @@ class SentinelStation:
             config=self.config,
             policy_config=self.policy_engine.config,
         )
+
+        self.db_path = Path(db_path) if db_path else None
+        if self.db_path:
+            from sentinel.store.db import init_database
+            init_database(self.db_path)
 
         self.state: SentinelState = "IDLE"
         self.active_session_id: str | None = None
@@ -267,6 +273,26 @@ class SentinelStation:
                 f"{prefix}REVIEW",
                 [f"{prefix}Menunggu persetujuan analis.", "Jangan cabut flashdisk."],
             )
+
+        # Record event in tamper-evident hashchain if db_path is configured
+        if self.db_path:
+            try:
+                from sentinel.store.hashchain import record_event
+                record_event(
+                    self.db_path,
+                    event_type="SESSION_DECISION",
+                    payload={
+                        "session_id": decision.session_id,
+                        "action": decision.action,
+                        "risk": decision.risk,
+                        "device_serial": device.serial_number,
+                        "policy_version": decision.policy_version,
+                        "deterministic_reasons": decision.deterministic_reasons,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("Failed to record decision to hashchain: %s", exc)
 
         # UNMOUNT
         self.state = "UNMOUNT"

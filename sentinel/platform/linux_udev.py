@@ -93,21 +93,34 @@ class LinuxUdevSource(UsbSource):
 
     def _parse_udev_device(self, device: Any) -> UsbDeviceDescriptor:
         """Extract descriptors from pyudev device."""
-        vid = device.get("ID_VENDOR_ID", "0000")
-        pid = device.get("ID_MODEL_ID", "0000")
-        serial = device.get("ID_SERIAL_SHORT", device.get("ID_SERIAL", "UNKNOWN"))
-        dev_class_str = device.attributes.get("bDeviceClass")
-        dev_class = int(dev_class_str, 16) if dev_class_str else 0x00
+        props = getattr(device, "properties", device)
+        vid = props.get("ID_VENDOR_ID", "0000")
+        pid = props.get("ID_MODEL_ID", "0000")
+        serial = props.get("ID_SERIAL_SHORT", props.get("ID_SERIAL", "UNKNOWN"))
+        dev_class_raw = device.attributes.get("bDeviceClass")
+        if dev_class_raw is not None:
+            if isinstance(dev_class_raw, bytes):
+                dev_class_raw = dev_class_raw.decode("ascii", errors="ignore")
+            try:
+                dev_class = int(dev_class_raw, 16)
+            except (ValueError, TypeError):
+                dev_class = 0x00
+        else:
+            dev_class = 0x00
 
-        # Scan interface classes
+        # Scan interface classes safely
         interface_classes: list[int] = []
         for child in device.children:
-            if child.subsystem == "usb" and "bInterfaceClass" in child.attributes:
-                try:
-                    iface_cls = int(child.attributes.get("bInterfaceClass"), 16)
-                    interface_classes.append(iface_cls)
-                except (ValueError, TypeError):
-                    pass
+            if child.subsystem == "usb":
+                iface_raw = child.attributes.get("bInterfaceClass")
+                if iface_raw is not None:
+                    if isinstance(iface_raw, bytes):
+                        iface_raw = iface_raw.decode("ascii", errors="ignore")
+                    try:
+                        iface_cls = int(iface_raw, 16)
+                        interface_classes.append(iface_cls)
+                    except (ValueError, TypeError):
+                        pass
 
         if not interface_classes and dev_class:
             interface_classes.append(dev_class)
@@ -119,8 +132,8 @@ class LinuxUdevSource(UsbSource):
             serial_number=serial,
             device_class=dev_class,
             interface_classes=interface_classes,
-            manufacturer=device.get("ID_VENDOR"),
-            product_name=device.get("ID_MODEL"),
+            manufacturer=props.get("ID_VENDOR"),
+            product_name=props.get("ID_MODEL"),
         )
 
     def build_mount_command(
