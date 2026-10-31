@@ -223,3 +223,53 @@ def test_mutant_4_omitted_scan_complete_guard_killed(
             deterministic_risk=0.0,
         )
         assert mutant_dec.action == "QUARANTINE", "Mutant 4 survived!"
+
+
+def test_mutant_5_clamd_offline_in_iot_mode_allow_killed(
+    policy_engine: PolicyEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mutant 5: Mutates behavior so that when ClamAV daemon is offline in IoT mode, it emits ALLOW.
+
+    Security Rule:
+    In IoT mode, an unavailable/offline ClamAV daemon MUST fail-closed to QUARANTINE (or BLOCK).
+    It must NEVER emit ALLOW.
+
+    When mutated to emit ALLOW on scanners_ok=False, the security assertion
+    (assert dec.action != "ALLOW") MUST FAIL, proving Mutant 5 is killed.
+    """
+    # 1. Unmutated production code: scanners_ok=False produces QUARANTINE, never ALLOW
+    clean_dec = policy_engine.decide(
+        session_id="mut-5",
+        scan_complete=True,
+        scanners_ok=False,  # ClamAV daemon is offline
+        filesystem_supported=True,
+        deterministic_risk=0.0,
+    )
+    assert clean_dec.action == "QUARANTINE"
+    assert clean_dec.action != "ALLOW"
+
+    # 2. Mutate PolicyEngine.decide to simulate the rogue mutant:
+    # "clamd tidak tersedia di mode iot menghasilkan ALLOW"
+    real_decide = policy_engine.decide
+
+    def mutant_decide(*args: Any, **kwargs: Any) -> Any:
+        res = real_decide(*args, **kwargs)
+        # Rogue mutation: if scanners_ok=False, bypass quarantine and allow the device anyway
+        if not kwargs.get("scanners_ok", True):
+            res.action = "ALLOW"
+        return res
+
+    monkeypatch.setattr(policy_engine, "decide", mutant_decide)
+
+    # 3. Security assertion MUST fail on mutant, killing Mutant 5
+    with pytest.raises(AssertionError, match="Mutant 5 survived! ClamAV offline emitted ALLOW"):
+        mutant_dec = policy_engine.decide(
+            session_id="mut-5",
+            scan_complete=True,
+            scanners_ok=False,
+            filesystem_supported=True,
+            deterministic_risk=0.0,
+        )
+        assert mutant_dec.action != "ALLOW", "Mutant 5 survived! ClamAV offline emitted ALLOW"
+

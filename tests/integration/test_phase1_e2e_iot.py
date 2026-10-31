@@ -26,7 +26,7 @@ from sentinel.platform.display_console import ConsoleDisplay
 from sentinel.platform.gpio import MockDoorLock, MockIndicator, MockTamper
 from sentinel.platform.mock_usb import MockUsbSource
 from sentinel.policy.engine import PolicyEngine
-from sentinel.scan.clamav import RUNTIME_EICAR_BYTES, MockClamAvScanner
+from sentinel.scan.clamav import RUNTIME_EICAR_BYTES, ClamAvScanner, MockClamAvScanner
 from sentinel.scan.engine import ScanEngine
 from sentinel.scan.static_runner import IsolatedStaticRunner
 from sentinel.scan.yara_scanner import MockYaraScanner
@@ -197,3 +197,115 @@ async def test_phase1_e2e_iot_lifecycle_and_fault_scenarios(
     )
     assert cli_proc.returncode == 0, f"verify-log CLI failed: {cli_proc.stderr}"
     assert "SUCCESS" in cli_proc.stdout and "Hash chain intact" in cli_proc.stdout
+
+
+def _is_real_clamd_available() -> tuple[bool, str | None, int | None]:
+    """Check if real clamd daemon is accessible via unix socket or TCP port 3310."""
+    sock_path = "/var/run/clamav/clamd.ctl"
+    if Path(sock_path).exists():
+        sc = ClamAvScanner(socket_path=sock_path, timeout_s=1.0)
+        if sc.is_available():
+            return True, sock_path, None
+    sc_tcp = ClamAvScanner(host="127.0.0.1", port=3310, timeout_s=1.0)
+    if sc_tcp.is_available():
+        return True, None, 3310
+    return False, None, None
+
+
+@pytest.mark.asyncio
+@pytest.mark.linux_only
+@pytest.mark.needs_clamd
+async def test_phase1_e2e_iot_with_real_clamd(
+    tmp_path: Path,
+    iot_device: UsbDeviceDescriptor,
+) -> None:
+    """Phase 1 E2E variant utilizing the REAL native ClamAV daemon via INSTREAM.
+
+    Verifies with real antivirus:
+    1. Benign clean file -> ALLOW
+    2. Real EICAR constructed dynamically at runtime -> BLOCK (detected by native clamd)
+    """
+    if not sys.platform.startswith("linux"):
+        pytest.skip("Test is Linux-only")
+
+    clamd_ok, sock_path, tcp_port = _is_real_clamd_available()
+    if not clamd_ok:
+        pytest.skip(
+            "Native clamd daemon is not reachable at /var/run/clamav/clamd.ctl or 127.0.0.1:3310. "
+            "Requires clamav-daemon service running."
+        )
+
+    # Initialize real ClamAV scanner
+    real_clamav = (
+        ClamAvScanner(socket_path=sock_path)
+        if sock_path
+        else ClamAvScanner(host="127.0.0.1", port=tcp_port or 3310)
+    )
+
+    target_mount = get_target_mount_dir(tmp_path / "real_clamd_mount")
+    target_mount.mkdir(parents=True, exist_ok=True)
+    db_file = tmp_path / "real_clamd_audit.db"
+
+    cfg = SentinelConfig(
+        mode="iot",
+        scan=ScanConfig(
+            max_file_mb=100,
+            max_static_analysis_mb=50,
+            allowed_filesystems=["vfat", "exfat"],
+        ),
+    )
+    pol_cfg = PolicyConfig(
+        version="1.0.0",
+        thresholds=PolicyThresholds(allow=0.15, review=0.40, block=0.75),
+    )
+    policy_engine = PolicyEngine(pol_cfg)
+    yara_sc = MockYaraScanner()
+    static_runner = IsolatedStaticRunner(timeout_s=2.0)
+
+    scan_engine = ScanEngine(
+        config=cfg,
+        policy_config=pol_cfg,
+        clamav_scanner=real_clamav,
+        yara_scanner=yara_sc,
+        static_runner=static_runner,
+    )
+
+    usb_source = MockUsbSource(default_mount_dir=target_mount)
+    display = ConsoleDisplay(silent=True)
+    indicator = MockIndicator()
+    station = SentinelStation(
+        config=cfg,
+        usb_source=usb_source,
+        display=display,
+        indicator=indicator,
+        policy_engine=policy_engine,
+        scan_engine=scan_engine,
+        db_path=db_file,
+    )
+
+    import time
+    def make_event() -> UsbEvent:
+        return UsbEvent(event_type="CONNECT", device=iot_device, timestamp=time.time())
+
+    # 1. Benign file with REAL ClamAV -> ALLOW
+    for f in target_mount.iterdir():
+        if f.is_file():
+            f.unlink()
+    benign_file = target_mount / "readme.txt"
+    benign_file.write_text("Hello, this is a completely clean test file.")
+
+    decision_benign = await station.handle_usb_event(make_event())
+    assert decision_benign is not None
+    assert decision_benign.action == "ALLOW"
+    assert indicator.current_state == "green"
+
+    # 2. Dynamic EICAR with REAL ClamAV -> BLOCK
+    eicar_file = target_mount / "eicar_sample.com"
+    eicar_file.write_bytes(RUNTIME_EICAR_BYTES)
+
+    decision_eicar = await station.handle_usb_event(make_event())
+    assert decision_eicar is not None
+    assert decision_eicar.action == "BLOCK"
+    assert indicator.current_state == "red"
+    assert any("Win.Test.EICAR_HDB-1" in r or "Eicar" in r or "clamav" in r.lower() for r in decision_eicar.deterministic_reasons)
+

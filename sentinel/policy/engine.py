@@ -20,17 +20,21 @@ class PolicyEngine:
         self,
         session_id: str,
         disallowed_classes: list[int],
+        reasons: list[str] | None = None,
     ) -> Decision:
         """Evaluate Layer 1 BadUSB / unallowed USB class violation."""
         risk = self.config.deterministic_risks.get("device_guard_violation", 1.0)
+        det_reasons = (
+            reasons
+            if reasons
+            else [f"BadUSB protection: disallowed interface class detected ({disallowed_classes})"]
+        )
         return Decision(
             session_id=session_id,
             action="BLOCK",
             risk=risk,
             policy_version=self.config.version,
-            deterministic_reasons=[
-                f"BadUSB protection: disallowed interface class detected ({disallowed_classes})"
-            ],
+            deterministic_reasons=det_reasons,
             ai_reasons=[],
             ai_available=False,
         )

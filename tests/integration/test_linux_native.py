@@ -167,6 +167,14 @@ def test_native_yara_compilation_and_matching(tmp_path: Path) -> None:
     if not sys.platform.startswith("linux"):
         pytest.skip("Test is Linux-only")
 
+    try:
+        import yara  # type: ignore[import-untyped]
+    except ImportError:
+        yara = None
+
+    if yara is None:
+        pytest.skip("yara-python is not installed in the environment")
+
     # 1. Valid rule compilation & matching
     valid_rule_path = tmp_path / "valid_test_rules.yar"
     valid_rule_path.write_text(

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from sentinel.agents.schemas import SessionContext
+from sentinel.guard.usb_class import evaluate_device_class
 from sentinel.platform.base import (
     Display,
     DoorLock,
@@ -161,17 +162,16 @@ class SentinelStation:
 
             # 2. GUARD_CHECK (Layer 1)
             self.state = "GUARD_CHECK"
-            # Rule: Only allowed classes permitted (default 0x08 Mass Storage).
-            # If any HID (0x03) or unallowed class is found -> BLOCK immediately.
-            disallowed = [
-                cls_id
-                for cls_id in device.interface_classes
-                if cls_id not in self.config.usb.allow_classes
-            ]
-            if disallowed or (0x03 in device.interface_classes):
+            guard_res = evaluate_device_class(
+                device=device,
+                allow_classes=self.config.usb.allow_classes,
+                serial_whitelist_file=self.config.usb.serial_whitelist_file,
+            )
+            if not guard_res.allowed:
                 decision = self.policy_engine.evaluate_guard_violation(
                     session_id=session_id,
-                    disallowed_classes=disallowed or [0x03],
+                    disallowed_classes=guard_res.disallowed_classes,
+                    reasons=guard_res.reasons,
                 )
                 await self._report_and_cleanup(device, decision)
                 return decision

@@ -32,6 +32,10 @@ iot = [
     "pyudev>=0.24.0",
     "gpiozero>=2.0",
     "luma.oled>=3.12.0",
+    "yara-python>=4.3.0",
+    "python-magic>=0.4.27",
+    "pefile>=2023.2.7",
+    "oletools>=0.60",
 ]
 
 [tool.setuptools.packages.find]
