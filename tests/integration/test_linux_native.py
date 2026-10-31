@@ -13,8 +13,7 @@ import pytest
 
 from sentinel.platform.linux_udev import LinuxUdevSource
 from sentinel.policy.engine import PolicyEngine
-from sentinel.scan.clamav import ClamAvScanner, RUNTIME_EICAR_BYTES
-from sentinel.scan.engine import ScanEngine
+from sentinel.scan.clamav import RUNTIME_EICAR_BYTES, ClamAvScanner
 from sentinel.scan.yara_scanner import YaraScanner
 from sentinel.util.config import PolicyConfig, SentinelConfig
 
@@ -56,7 +55,7 @@ def get_clamd_stream_max_length() -> int:
                                 mult = 1024 * 1024 * 1024
                                 val_str = val_str[:-1]
                             return int(val_str) * mult
-            except Exception:
+            except (OSError, ValueError):
                 pass
     return 25 * 1024 * 1024  # Default 25 MB
 
@@ -143,6 +142,7 @@ def test_clamav_daemon_offline_in_iot_mode_quarantined() -> None:
     assert scanner.is_available() is False
 
     cfg = SentinelConfig(mode="iot")
+    assert cfg.mode == "iot"
     pol_cfg = PolicyConfig()
     policy = PolicyEngine(pol_cfg)
 
@@ -230,7 +230,7 @@ def test_udev_device_guard_against_connected_hardware() -> None:
         pytest.skip("Test is Linux-only")
 
     try:
-        import pyudev
+        import pyudev  # type: ignore[import-untyped]
     except ImportError:
         pytest.skip("pyudev is not installed")
 

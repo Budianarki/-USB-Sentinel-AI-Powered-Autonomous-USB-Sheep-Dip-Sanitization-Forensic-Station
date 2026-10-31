@@ -94,11 +94,13 @@ def test_mutant_1_inverted_hash_check_killed(
     monkeypatch.setattr(stream_reader_mod, "process_untrusted_file_stream", mutant_stream_func)
 
     # 3. Assert that the mutant causes the security assertion to FAIL (mutant killed)
-    with pytest.raises(AssertionError, match="assert True is False"):
-        with stream_reader_mod.process_untrusted_file_stream(
+    with (
+        pytest.raises(AssertionError, match="assert True is False"),
+        stream_reader_mod.process_untrusted_file_stream(
             usb_file, MockClamAvScanner(), _simulate_tamper_on_temp=True
-        ) as mutant_res:
-            assert mutant_res.integrity_verified is False, "Mutant 1 survived!"
+        ) as mutant_res,
+    ):
+        assert mutant_res.integrity_verified is False, "Mutant 1 survived!"
 
 
 def test_mutant_2_suppressed_integrity_flag_killed(
@@ -131,11 +133,13 @@ def test_mutant_2_suppressed_integrity_flag_killed(
     monkeypatch.setattr(stream_reader_mod, "process_untrusted_file_stream", mutant_stream_func)
 
     # 3. Security assertion fails on mutant
-    with pytest.raises(AssertionError, match="Mutant 2 survived"):
-        with stream_reader_mod.process_untrusted_file_stream(
+    with (
+        pytest.raises(AssertionError, match="Mutant 2 survived"),
+        stream_reader_mod.process_untrusted_file_stream(
             usb_file, MockClamAvScanner(), _simulate_tamper_on_temp=True
-        ) as mutant_res:
-            assert "integrity_hash_mismatch" in mutant_res.flags, "Mutant 2 survived!"
+        ) as mutant_res,
+    ):
+        assert "integrity_hash_mismatch" in mutant_res.flags, "Mutant 2 survived!"
 
 
 def test_mutant_3_policy_engine_allow_on_incomplete_scan_killed(

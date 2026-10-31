@@ -10,7 +10,7 @@ import sys
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sentinel.platform.base import (
     MountResult,
@@ -71,7 +71,9 @@ class LinuxUdevSource(UsbSource):
             if action not in ("add", "remove"):
                 return
 
-            event_type = "CONNECT" if action == "add" else "DISCONNECT"
+            event_type: Literal["CONNECT", "DISCONNECT"] = (
+                "CONNECT" if action == "add" else "DISCONNECT"
+            )
             dev_desc = self._parse_udev_device(device)
             event = UsbEvent(
                 event_type=event_type,

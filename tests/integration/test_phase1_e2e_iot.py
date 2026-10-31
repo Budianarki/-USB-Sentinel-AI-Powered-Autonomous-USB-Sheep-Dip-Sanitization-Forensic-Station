@@ -26,7 +26,7 @@ from sentinel.platform.display_console import ConsoleDisplay
 from sentinel.platform.gpio import MockDoorLock, MockIndicator, MockTamper
 from sentinel.platform.mock_usb import MockUsbSource
 from sentinel.policy.engine import PolicyEngine
-from sentinel.scan.clamav import ClamAvScanner, MockClamAvScanner, RUNTIME_EICAR_BYTES
+from sentinel.scan.clamav import RUNTIME_EICAR_BYTES, MockClamAvScanner
 from sentinel.scan.engine import ScanEngine
 from sentinel.scan.static_runner import IsolatedStaticRunner
 from sentinel.scan.yara_scanner import MockYaraScanner
@@ -189,7 +189,7 @@ async def test_phase1_e2e_iot_lifecycle_and_fault_scenarios(
     assert err is None
 
     # Run verify-log CLI subprocess to ensure CLI entrypoint succeeds
-    cli_proc = subprocess.run(
+    cli_proc = subprocess.run(  # noqa: ASYNC221
         [sys.executable, "-m", "sentinel.store.hashchain", "--db", str(db_file)],
         capture_output=True,
         text=True,
