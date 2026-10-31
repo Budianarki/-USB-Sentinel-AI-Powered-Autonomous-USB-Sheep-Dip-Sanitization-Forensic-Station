@@ -9,6 +9,7 @@ from typing import Literal
 
 from sentinel.agents.schemas import SessionContext
 from sentinel.guard.usb_class import evaluate_device_class
+from sentinel.notify.telegram import TelegramNotifier
 from sentinel.platform.base import (
     Display,
     DoorLock,
@@ -58,6 +59,7 @@ class SentinelStation:
         policy_engine: PolicyEngine | None = None,
         scan_engine: ScanEngine | None = None,
         db_path: Path | str | None = None,
+        telegram_notifier: TelegramNotifier | None = None,
     ) -> None:
         self.config = config
         self.usb_source = usb_source
@@ -69,6 +71,9 @@ class SentinelStation:
         self.scan_engine = scan_engine or ScanEngine(
             config=self.config,
             policy_config=self.policy_engine.config,
+        )
+        self.telegram_notifier = telegram_notifier or TelegramNotifier(
+            config=self.config.notify.telegram
         )
 
         self.db_path = Path(db_path) if db_path else None
@@ -294,6 +299,21 @@ class SentinelStation:
                 import logging
                 logging.getLogger(__name__).warning("Failed to record decision to hashchain: %s", exc)
 
+        # Notify Telegram and broadcast hash chain anchor (fail-safe)
+        try:
+            self.telegram_notifier.notify_session(
+                session_id=decision.session_id,
+                decision=decision,
+                device_fingerprint=self._calculate_fingerprint(device),
+            )
+            if self.db_path:
+                from sentinel.store.hashchain import export_head
+                count, head_hash = export_head(self.db_path)
+                self.telegram_notifier.send_hashchain_anchor(count, head_hash)
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Telegram notification/anchor failed: %s", exc)
+
         # UNMOUNT
         self.state = "UNMOUNT"
         await self.usb_source.unmount(device)
@@ -309,7 +329,11 @@ class SentinelStation:
             await self.handle_usb_event(event)
 
 
-def create_station(config_path: str | Path | None = None) -> SentinelStation:
+def create_station(
+    config_path: str | Path | None = None,
+    db_path: Path | str | None = None,
+    telegram_notifier: TelegramNotifier | None = None,
+) -> SentinelStation:
     """Factory creating SentinelStation based on configuration mode."""
     cfg = load_sentinel_config(config_path)
     usb_source: UsbSource
@@ -336,4 +360,6 @@ def create_station(config_path: str | Path | None = None) -> SentinelStation:
         indicator=indicator,
         tamper=tamper,
         door_lock=door_lock,
+        db_path=db_path,
+        telegram_notifier=telegram_notifier,
     )

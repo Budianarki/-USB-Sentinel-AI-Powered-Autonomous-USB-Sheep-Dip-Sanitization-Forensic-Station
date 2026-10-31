@@ -1,0 +1,53 @@
+[Unit]
+Description=USB Sentinel - Sheep-Dip Air-gapped Flashdisk Inspection Daemon
+Documentation=https://github.com/gempurbudianarki/Pembersih-virus-untuk-flashdisk
+After=network.target local-fs.target clamav-daemon.service
+Wants=clamav-daemon.service
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+WorkingDirectory=/opt/sentinel
+ExecStart=/opt/sentinel/.venv/bin/python -m sentinel --config /etc/sentinel/sentinel.yaml --db /var/lib/sentinel/sentinel_audit.db
+Restart=always
+RestartSec=5s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+
+# ==============================================================================
+# Security Hardening & Minimal Privilege Isolation (Checkpoint 2A)
+# ==============================================================================
+
+# 1. Non-root user and privilege escalation prevention
+NoNewPrivileges=true
+
+# 2. Strict read-only filesystem protection with isolated writable targets
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/mnt/sentinel /var/lib/sentinel /var/log/sentinel
+ReadOnlyPaths=/etc/sentinel /opt/sentinel
+
+# 3. Kernel and control group isolation
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# 4. Device access restricted to USB bus and block devices
+DevicePolicy=closed
+DeviceAllow=/dev/bus/usb rw
+DeviceAllow=block-* rw
+
+# 5. Minimum capabilities strictly required for kernel filesystem mount/unmount
+CapabilityBoundingSet=CAP_SYS_ADMIN
+AmbientCapabilities=CAP_SYS_ADMIN
+
+# 6. Socket address family restriction (Local IPC, Netlink for udev, TCP for ClamAV/Gateway)
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=false
+LockPersonality=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

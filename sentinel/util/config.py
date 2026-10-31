@@ -87,6 +87,8 @@ class TelegramConfig(BaseModel):
     enabled: bool = Field(default=False)
     chat_id_env: str = Field(default="TG_CHAT_ID")
     token_env: str = Field(default="TG_TOKEN")
+    allowed_chat_ids: list[str] = Field(default_factory=list)
+    anchor_interval_s: int = Field(default=300, ge=10)
 
 
 class NotifyConfig(BaseModel):

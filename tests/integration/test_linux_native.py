@@ -168,7 +168,7 @@ def test_native_yara_compilation_and_matching(tmp_path: Path) -> None:
         pytest.skip("Test is Linux-only")
 
     try:
-        import yara  # type: ignore[import-untyped]
+        import yara  # type: ignore[import-untyped, import-not-found]
     except ImportError:
         yara = None
 
