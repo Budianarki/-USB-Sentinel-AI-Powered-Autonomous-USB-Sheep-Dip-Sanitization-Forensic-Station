@@ -248,7 +248,8 @@ def run_tui() -> None:
         console.print(f"  • Node       : [bold white]{dev['node']}[/bold white]")
         console.print(f"  • Serial     : [dim]{dev['serial']}[/dim]")
         console.print(f"  • UUID       : [bold yellow]{dev['uuid']}[/bold yellow]")
-        console.print(f"  • Kapasitas  : [bold green]{dev['size_gb']} GB[/bold green] ({dev['fs_type'].upper()})")
+        fs_label = (dev.get("fs_type") or "VFAT").upper()
+        console.print(f"  • Kapasitas  : [bold green]{dev.get('size_gb', 0)} GB[/bold green] ({fs_label})")
         console.print(f"  • Mount Point: [dim]{dev['mount_point']}[/dim]\n")
 
         try:

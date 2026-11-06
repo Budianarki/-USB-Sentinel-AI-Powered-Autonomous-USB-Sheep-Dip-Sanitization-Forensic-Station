@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -70,8 +70,10 @@ class CleanRequest(BaseModel):
 
 
 @ui_app.get("/api/devices")
-async def get_connected_devices() -> dict[str, Any]:
+async def get_connected_devices(response: Response) -> dict[str, Any]:
     """Poll currently connected USB storage hardware with BadUSB telemetry."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     devices = list_connected_usb_devices()
     for d in devices:
         # Check BadUSB indicators
@@ -730,9 +732,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           <div class="lg:col-span-8 space-y-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <span class="text-xs font-black uppercase tracking-wider text-slate-400">Status Port USB Sistem</span>
-              <span id="device-badge" class="clay-pill bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                0 Perangkat USB Terhubung
-              </span>
+              <div class="flex items-center gap-2">
+                <button onclick="checkDevices(true)" class="clay-btn clay-btn-neutral text-[11px] px-3 py-1 flex items-center gap-1.5" title="Paksa segarkan status port USB">
+                  <span id="refresh-spinner">🔄</span> Segarkan Port
+                </button>
+                <span id="device-badge" class="clay-pill bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                  0 Perangkat USB Terhubung
+                </span>
+              </div>
             </div>
 
             <div>
@@ -1243,10 +1250,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       document.getElementById('clock-display').innerText = new Date().toLocaleTimeString('id-ID');
     }, 1000);
 
-    // Polling Hardware USB Storage
-    async function checkDevices() {
+    // Polling Hardware USB Storage with Cache-Busting & Fallback
+    async function checkDevices(manual = false) {
+      if (manual) {
+        playClick();
+        const sp = document.getElementById('refresh-spinner');
+        if (sp) sp.classList.add('animate-spin');
+        setTimeout(() => { if (sp) sp.classList.remove('animate-spin'); }, 800);
+      }
       try {
-        const res = await fetch('/api/devices');
+        const apiUrl = window.location.origin.startsWith('http') ? '' : 'http://localhost:8080';
+        const res = await fetch(apiUrl + '/api/devices?_t=' + Date.now(), { cache: 'no-store' });
         const data = await res.json();
         connectedDevices = data.devices || [];
         updateDeviceUI(connectedDevices);
@@ -1278,16 +1292,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         pluggedView.classList.add('hidden');
       } else {
         const dev = devices[0];
+        const isMounted = Boolean(dev.mount_point && dev.is_mounted);
+        const fsType = (dev.fs_type || 'VFAT').toUpperCase();
+        const sizeGb = (dev.size_gb !== undefined && dev.size_gb !== null) ? dev.size_gb : 0;
+        const devSerial = dev.serial || 'N/A';
+        const devUuid = dev.uuid || 'N/A';
+        const devNode = dev.node || '/dev/sda1';
+        const devModel = dev.model || dev.label || 'Flash Drive';
+
         badge.className = "clay-pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block mr-1"></span> 1 Flashdisk Siap Diuji';
 
-        title.innerHTML = `Terdeteksi: <span class="text-cyan-400 font-black">${dev.label || dev.model}</span>`;
-        subtitle.innerText = `Partisi aktif di ${dev.node} terpasang pada ${dev.mount_point}. Siap untuk pembersihan & inspeksi 4-Layer.`;
+        title.innerHTML = `Terdeteksi: <span class="text-cyan-400 font-black">${dev.label || devModel}</span>`;
+        if (isMounted) {
+          subtitle.innerText = `Partisi aktif di ${devNode} terpasang pada ${dev.mount_point}. Siap untuk pembersihan & inspeksi 4-Layer.`;
+        } else {
+          subtitle.innerText = `Partisi terdeteksi di ${devNode}. Sistem sedang mengaitkan mount point otomatis...`;
+        }
 
-        document.getElementById('meta-node').innerText = dev.node;
-        document.getElementById('meta-uuid').innerText = `${dev.uuid || 'N/A'} (${dev.fs_type.toUpperCase()})`;
-        document.getElementById('meta-size').innerText = `${dev.size_gb} GB`;
-        document.getElementById('meta-serial').innerText = dev.serial;
+        document.getElementById('meta-node').innerText = devNode;
+        document.getElementById('meta-uuid').innerText = `${devUuid} (${fsType})`;
+        document.getElementById('meta-size').innerText = `${sizeGb} GB`;
+        document.getElementById('meta-serial').innerText = devSerial;
         meta.classList.remove('hidden');
 
         btnScan.disabled = false;
@@ -1295,7 +1321,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         unPluggedView.classList.add('hidden');
         pluggedView.classList.remove('hidden');
-        document.getElementById('disk-model-text').innerText = dev.model || 'SanDisk';
+        document.getElementById('disk-model-text').innerText = devModel;
       }
     }
 
@@ -1728,8 +1754,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       document.getElementById('cert-head-hash').innerText = data.hashchain.head_hash;
     }
 
-    // Init Polling
-    setInterval(checkDevices, 2000);
+    // Init Polling (Fast 1.2s reactive loop)
+    setInterval(checkDevices, 1200);
     checkDevices();
   </script>
 </body>
