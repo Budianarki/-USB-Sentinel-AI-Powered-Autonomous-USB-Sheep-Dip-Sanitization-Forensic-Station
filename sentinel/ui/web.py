@@ -1664,7 +1664,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         document.getElementById('forensic-total-entropy').innerText = `Entropi Total: ${data.total_entropy}`;
 
         // Hex view
-        const hexLines = (data.hex_lines || []).map(l => `${l.offset}  ${l.hex}  |${l.ascii}|`).join('\n');
+        const hexLines = (data.hex_lines || []).map(l => `${l.offset}  ${l.hex}  |${l.ascii}|`).join(String.fromCharCode(10));
         document.getElementById('forensic-hex-view').innerText = hexLines || "Tidak ada data hex.";
 
         // Entropy bars
@@ -1709,7 +1709,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         document.getElementById('modal-entropy-val').innerText = `Total: ${data.total_entropy} (Shannon)`;
 
         // Hex
-        const hexLines = (data.hex_lines || []).map(l => `${l.offset}  ${l.hex}  |${l.ascii}|`).join('\n');
+        const hexLines = (data.hex_lines || []).map(l => `${l.offset}  ${l.hex}  |${l.ascii}|`).join(String.fromCharCode(10));
         document.getElementById('modal-hex-content').innerText = hexLines || "Tidak ada data biner.";
 
         // Entropy bars
