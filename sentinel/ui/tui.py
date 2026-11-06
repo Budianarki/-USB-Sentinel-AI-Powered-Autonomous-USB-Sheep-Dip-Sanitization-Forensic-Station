@@ -146,7 +146,25 @@ async def execute_scan(target_device: dict) -> tuple[str, list[str]]:
     scan_res = station.scan_engine.scan_mount(mount_dir)
     bad_files: list[str] = []
     for f in scan_res.file_features:
-        is_bad = bool(f.av_hits or f.yara_hits or f.ext_mismatch or any("macro" in fl for fl in f.flags))
+        threat_keys = (
+            "macro",
+            "powershell",
+            "autorun",
+            "shortcut",
+            "double",
+            "disguised",
+            "ransomware",
+            "wscript",
+            "reverse_shell",
+            "high_entropy",
+            "type_mismatch",
+        )
+        is_bad = bool(
+            f.av_hits
+            or f.yara_hits
+            or f.ext_mismatch
+            or any(any(k in fl for k in threat_keys) for fl in f.flags)
+        )
         if is_bad and f.sanitized_name:
             bad_files.append(f.sanitized_name)
         status_text = "[bold red]THREAT[/bold red]" if is_bad else "[bold green]CLEAN[/bold green]"

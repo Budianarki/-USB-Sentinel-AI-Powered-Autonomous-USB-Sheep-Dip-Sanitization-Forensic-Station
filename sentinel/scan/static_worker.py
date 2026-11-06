@@ -10,6 +10,8 @@ from pathlib import Path
 
 from sentinel.scan.filetype import detect_file_type
 from sentinel.scan.static_tools import (
+    analyze_autorun,
+    analyze_lnk,
     analyze_office,
     analyze_pdf,
     analyze_pe,
@@ -66,10 +68,20 @@ def run_worker() -> None:
         result["static_summary"]["pdf"] = pdf_summary
         result["flags"].extend(pdf_summary.get("flags", []))
 
-    if tool == "script" or (tool == "all" and type_res.detected_type == "script"):
+    if tool == "script" or (tool == "all" and type_res.detected_type in ("script", "autorun")):
         script_summary = analyze_script(file_path)
         result["static_summary"]["script"] = script_summary
         result["flags"].extend(script_summary.get("flags", []))
+
+    if type_res.detected_type == "lnk" or filename.lower().endswith(".lnk"):
+        lnk_summary = analyze_lnk(file_path)
+        result["static_summary"]["lnk"] = lnk_summary
+        result["flags"].extend(lnk_summary.get("flags", []))
+
+    if type_res.detected_type == "autorun" or filename.lower().endswith(".inf"):
+        autorun_summary = analyze_autorun(file_path)
+        result["static_summary"]["autorun"] = autorun_summary
+        result["flags"].extend(autorun_summary.get("flags", []))
 
     # De-duplicate flags
     result["flags"] = list(dict.fromkeys(result["flags"]))

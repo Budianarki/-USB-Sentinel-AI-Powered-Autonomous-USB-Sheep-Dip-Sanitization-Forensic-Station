@@ -327,6 +327,31 @@ class ScanEngine:
                             self.policy_config.deterministic_risks.get("archive_encrypted", 0.60),
                         )
 
+                    if "autorun_autoexec_trigger" in file_flags or "autorun_inf_present" in file_flags:
+                        file_risk = max(file_risk, 0.95)
+                        reasons.append(f"AutoRun infection script detected in '{name_res.sanitized_name}'")
+
+                    if "double_extension_deception" in file_flags:
+                        file_risk = max(file_risk, 0.90)
+                        reasons.append(f"Deceptive double-extension detected in '{name_res.sanitized_name}'")
+
+                    if any(f.startswith("lnk_invokes_") for f in file_flags):
+                        file_risk = max(file_risk, 0.95)
+                        reasons.append(f"Malicious shortcut payload execution detected in '{name_res.sanitized_name}'")
+
+                    if "ransomware_note_detected" in file_flags:
+                        file_risk = max(file_risk, 0.95)
+                        reasons.append(f"Ransomware extortion note detected in '{name_res.sanitized_name}'")
+
+                    if (
+                        "wscript_shell_invocation" in file_flags
+                        or "remote_downloader" in file_flags
+                        or "amsi_bypass" in file_flags
+                        or "powershell_encoded" in file_flags
+                    ):
+                        file_risk = max(file_risk, 0.90)
+                        reasons.append(f"Malicious script payload execution detected in '{name_res.sanitized_name}'")
+
                     features = FileFeatures(
                         file_id=file_id,
                         sha256=stream_res.sha256,

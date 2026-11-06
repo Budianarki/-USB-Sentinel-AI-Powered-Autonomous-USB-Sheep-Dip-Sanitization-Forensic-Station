@@ -171,7 +171,7 @@ def analyze_script(file_path: Path) -> dict[str, Any]:
         lower = text.lower()
 
         patterns = [
-            ("Invoke-Expression", "powershell_iex"),
+            ("invoke-expression", "powershell_iex"),
             ("iex ", "powershell_iex"),
             ("-encodedcommand", "powershell_encoded"),
             ("-enc ", "powershell_encoded"),
@@ -179,6 +179,16 @@ def analyze_script(file_path: Path) -> dict[str, Any]:
             ("downloadstring", "remote_download"),
             ("eval(", "eval_invocation"),
             ("certutil -decode", "certutil_decode"),
+            ("wscript.shell", "wscript_shell_invocation"),
+            ("activexobject", "activex_creation"),
+            ("msxml2.xmlhttp", "remote_downloader"),
+            ("winhttprequest", "remote_downloader"),
+            ("bitsadmin", "bitsadmin_downloader"),
+            ("reg add", "registry_persistence"),
+            ("netsh advfirewall", "firewall_tampering"),
+            ("attrib +h", "file_hiding"),
+            ("amsiutils", "amsi_bypass"),
+            ("tcpclient", "reverse_shell"),
         ]
 
         for pattern, flag in patterns:
@@ -193,4 +203,45 @@ def analyze_script(file_path: Path) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         summary["flags"].append(f"script_parse_error: {exc}")
 
+    return summary
+
+
+def analyze_lnk(file_path: Path) -> dict[str, Any]:
+    """Inspect Windows Shell Link (.lnk) files for command invocation."""
+    summary: dict[str, Any] = {
+        "is_lnk": True,
+        "has_command": False,
+        "flags": ["windows_shortcut_detected"],
+    }
+    try:
+        raw = file_path.read_bytes()
+        lower = raw.lower()
+        commands = [b"powershell", b"cmd.exe", b"wscript", b"cscript", b"mshta", b"rundll32", b"regsvr32", b"bitsadmin"]
+        for cmd in commands:
+            if cmd in lower:
+                summary["has_command"] = True
+                cmd_str = cmd.decode("ascii")
+                summary["flags"].append(f"lnk_invokes_{cmd_str}")
+    except Exception as exc:  # noqa: BLE001
+        summary["flags"].append(f"lnk_parse_error: {exc}")
+    return summary
+
+
+def analyze_autorun(file_path: Path) -> dict[str, Any]:
+    """Inspect autorun.inf files for automatic execution triggers."""
+    summary: dict[str, Any] = {
+        "is_autorun": True,
+        "autoexec": False,
+        "flags": ["autorun_inf_present"],
+    }
+    try:
+        text = file_path.read_text(encoding="utf-8", errors="ignore").lower()
+        triggers = ["open=", "shellexecute=", "shell\\open\\command=", "shell\\explore\\command="]
+        for trig in triggers:
+            if trig in text:
+                summary["autoexec"] = True
+                summary["flags"].append("autorun_autoexec_trigger")
+                break
+    except Exception as exc:  # noqa: BLE001
+        summary["flags"].append(f"autorun_parse_error: {exc}")
     return summary

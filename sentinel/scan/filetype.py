@@ -20,9 +20,24 @@ MAGIC_SIGNATURES: list[tuple[bytes, str]] = [
     (b"GIF89a", "gif"),
     (b"Rar!\x1a\x07", "rar"),
     (b"7z\xbc\xaf\x27\x1c", "7z"),
+    (b"\x4c\x00\x00\x00", "lnk"),
 ]
 
-SCRIPT_EXTENSIONS = {".ps1", ".bat", ".cmd", ".vbs", ".js", ".sh", ".py", ".bash", ".wsf"}
+SCRIPT_EXTENSIONS = {
+    ".ps1",
+    ".bat",
+    ".cmd",
+    ".vbs",
+    ".js",
+    ".sh",
+    ".py",
+    ".bash",
+    ".wsf",
+    ".hta",
+    ".inf",
+}
+EXEC_EXTENSIONS = {".exe", ".dll", ".sys", ".scr", ".com", ".pif", ".cpl", ".bin"}
+DANGEROUS_DOUBLE_TARGETS = {"pdf", "docx", "xlsx", "pptx", "jpg", "jpeg", "png", "txt", "mp4", "mp3"}
 
 
 @dataclass
@@ -83,13 +98,40 @@ def detect_file_type(
             if header and all(32 <= b <= 126 or b in (9, 10, 13) for b in header[:128]):
                 detected_type = "txt"
 
+    # Check double extension deception (e.g., invoice.pdf.exe, tender.xlsx.vbs)
+    parts = Path(filename).name.split(".")
+    if len(parts) >= 3:
+        inner_ext = parts[-2].lower()
+        outer_ext = parts[-1].lower()
+        if inner_ext in DANGEROUS_DOUBLE_TARGETS and (
+            f".{outer_ext}" in EXEC_EXTENSIONS or f".{outer_ext}" in SCRIPT_EXTENSIONS
+        ):
+            flags.append("double_extension_deception")
+            flags.append(f"disguised_as_{inner_ext}")
+
+    # Check Autorun
+    if Path(filename).name.lower() == "autorun.inf":
+        flags.append("autorun_inf_present")
+        detected_type = "autorun"
+
+    # Check Windows Shortcut (.lnk)
+    if ext == ".lnk" or detected_type == "lnk":
+        flags.append("windows_shortcut_detected")
+
+    # Check Ransomware Note / Encrypted extension
+    lower_fname = filename.lower()
+    if any(k in lower_fname for k in ["readme_decrypt", "restore_files", "how_to_recover", "decrypt_files"]):
+        flags.append("ransomware_note_detected")
+    if ext in (".locked", ".crypto", ".crypted", ".enc"):
+        flags.append("ransomware_encrypted_extension")
+
     # Extension mismatch logic
     ext_mismatch = False
     clean_ext = ext.lstrip(".")
 
     # Flag critical dangerous mismatches
     if detected_type in ("pe", "elf"):
-        if clean_ext not in ("exe", "dll", "sys", "bin", "elf", "so", "scr"):
+        if clean_ext not in ("exe", "dll", "sys", "bin", "elf", "so", "scr", "com"):
             ext_mismatch = True
             flags.append("type_mismatch")
             flags.append(f"executable_disguised_as_{clean_ext or 'none'}")

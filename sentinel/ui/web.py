@@ -12,8 +12,10 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import subprocess
 import time
 from pathlib import Path
 from typing import Any
@@ -101,6 +103,23 @@ async def trigger_live_scan(req: ScanRequest) -> dict[str, Any]:
             target_device_info = matched[0]
 
     mount_point_str = target_device_info.get("mount_point")
+    if not mount_point_str or not Path(mount_point_str).exists():
+        try:
+            m_res = await asyncio.to_thread(
+                subprocess.run,
+                ["udisksctl", "mount", "-b", target_device_info["node"], "--no-user-interaction"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            for word in m_res.stdout.strip().split():
+                if word.startswith(("/media", "/run/media", "/mnt")):
+                    mount_point_str = word.rstrip(".")
+                    break
+        except Exception as auto_m_err:  # noqa: BLE001
+            logger.debug("On-demand mount failed: %s", auto_m_err)
+
     if not mount_point_str or not Path(mount_point_str).exists():
         raise HTTPException(
             status_code=400,
@@ -214,12 +233,24 @@ async def trigger_live_scan(req: ScanRequest) -> dict[str, Any]:
                 found_path = candidate
                 break
         abs_p = found_path or (scan_target_path / target_name)
+        threat_keywords = (
+            "macro",
+            "powershell",
+            "autorun",
+            "shortcut",
+            "double_extension",
+            "disguised",
+            "ransomware",
+            "wscript",
+            "reverse_shell",
+            "high_entropy",
+            "type_mismatch",
+        )
         is_bad = bool(
             f.av_hits
             or f.yara_hits
             or f.ext_mismatch
-            or any("macro_autoexec" in fl for fl in f.flags)
-            or any("powershell" in fl for fl in f.flags)
+            or any(any(k in fl for k in threat_keywords) for fl in f.flags)
         )
         scanned_files.append({
             "name": target_name,

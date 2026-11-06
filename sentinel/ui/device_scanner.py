@@ -1,6 +1,16 @@
-"""Hardware USB storage device detector for Sentinel Station UI/UX."""
+"""Hardware USB storage device detector for Sentinel Station UI/UX.
 
+Multi-source hardware detection:
+1. Primary: pyudev kernel block subsystem with USB bus parent discovery
+2. Secondary fallback: lsblk -J -O hardware hierarchy analysis
+3. Dynamic auto-mount via udisks2 for plug-and-play sheep-dip station
+"""
+
+from __future__ import annotations
+
+import json
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +36,7 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
     except Exception as exc:  # noqa: BLE001
         logger.debug("Failed reading /proc/mounts: %s", exc)
 
+    # 1. Primary: pyudev detection
     try:
         import pyudev  # type: ignore[import-untyped]
 
@@ -33,12 +44,15 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
         for dev in context.list_devices(subsystem="block"):
             props = dev.properties
             dev_type = props.get("DEVTYPE")
-            if dev_type != "partition":
-                continue
 
             # Check if device sits on the USB bus
-            parent_usb = dev.find_parent("usb")
+            parent_usb = dev.find_parent("usb") or (props.get("ID_BUS") == "usb")
             if not parent_usb:
+                continue
+
+            # Accept partitions or unpartitioned formatted raw disks
+            has_fs = bool(props.get("ID_FS_TYPE") or props.get("ID_FS_USAGE") == "filesystem")
+            if dev_type != "partition" and not (dev_type == "disk" and has_fs):
                 continue
 
             node = dev.device_node or ""
@@ -55,7 +69,6 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
             # Find active mount point
             active_mount = mount_points.get(node)
             if not active_mount and uuid_val:
-                # Check standard linux automount locations
                 media_path = Path("/media")
                 for candidate in media_path.glob(f"*/{uuid_val}"):
                     if candidate.exists():
@@ -64,7 +77,6 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
 
             # Fallback auto-mount if device is plugged but unmounted
             if not active_mount and node:
-                import subprocess
                 try:
                     res = subprocess.run(
                         ["udisksctl", "mount", "-b", node, "--no-user-interaction"],
@@ -76,7 +88,7 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
                     if res.returncode == 0:
                         for word in res.stdout.strip().split():
                             if word.startswith(("/media", "/run/media", "/mnt")):
-                                active_mount = word
+                                active_mount = word.rstrip(".")
                                 break
                 except Exception as mount_exc:  # noqa: BLE001
                     logger.debug("Auto-mount fallback failed: %s", mount_exc)
@@ -95,6 +107,94 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
             })
 
     except Exception as exc:  # noqa: BLE001
-        logger.error("Error detecting USB block devices via pyudev: %s", exc)
+        logger.debug("Error detecting USB block devices via pyudev: %s", exc)
+
+    # 2. Secondary fallback: lsblk -J -O if pyudev returned 0 devices
+    if not devices:
+        try:
+            lsblk_res = subprocess.run(
+                ["lsblk", "-J", "-O"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=4,
+            )
+            if lsblk_res.returncode == 0:
+                blk_data = json.loads(lsblk_res.stdout)
+                for blk in blk_data.get("blockdevices", []):
+                    is_usb = (
+                        blk.get("tran") == "usb"
+                        or blk.get("hotplug") is True
+                        or "usb" in (blk.get("subsystems") or "")
+                        or (blk.get("rm") is True and blk.get("kname", "").startswith("sd"))
+                    )
+                    if not is_usb:
+                        continue
+
+                    vendor = (blk.get("vendor") or "USB").strip()
+                    model = (blk.get("model") or "Storage").strip()
+                    serial = blk.get("serial") or "UNKNOWN"
+
+                    # Check partitions under this disk
+                    children = blk.get("children", [])
+                    targets = children if children else [blk]
+
+                    for target in targets:
+                        node = target.get("path") or f"/dev/{target.get('kname', '')}"
+                        uuid_val = target.get("uuid") or "UNKNOWN"
+                        fs_type = target.get("fstype") or "vfat"
+                        size_str = target.get("size") or "0G"
+
+                        size_gb = 0.0
+                        if size_str.endswith("G"):
+                            try:
+                                size_gb = float(size_str.rstrip("G"))
+                            except ValueError:
+                                pass
+                        elif size_str.endswith("M"):
+                            try:
+                                size_gb = round(float(size_str.rstrip("M")) / 1024, 2)
+                            except ValueError:
+                                pass
+
+                        mountpoint = target.get("mountpoint")
+                        if not mountpoint and target.get("mountpoints"):
+                            for mp in target["mountpoints"]:
+                                if mp:
+                                    mountpoint = mp
+                                    break
+
+                        # Auto-mount if unmounted
+                        if not mountpoint and node:
+                            try:
+                                mount_sub = subprocess.run(
+                                    ["udisksctl", "mount", "-b", node, "--no-user-interaction"],
+                                    check=False,
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=3,
+                                )
+                                if mount_sub.returncode == 0:
+                                    for word in mount_sub.stdout.strip().split():
+                                        if word.startswith(("/media", "/run/media", "/mnt")):
+                                            mountpoint = word.rstrip(".")
+                                            break
+                            except Exception as m_err:  # noqa: BLE001
+                                logger.debug("lsblk fallback auto-mount failed: %s", m_err)
+
+                        devices.append({
+                            "node": node,
+                            "vendor": vendor,
+                            "model": model,
+                            "label": f"{vendor} {model}".strip(),
+                            "serial": serial,
+                            "uuid": uuid_val,
+                            "fs_type": fs_type,
+                            "size_gb": size_gb,
+                            "mount_point": mountpoint or "",
+                            "is_mounted": bool(mountpoint),
+                        })
+        except Exception as lsblk_exc:  # noqa: BLE001
+            logger.debug("Failed running lsblk fallback: %s", lsblk_exc)
 
     return devices
