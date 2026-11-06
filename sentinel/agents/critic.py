@@ -30,3 +30,4 @@ class CriticAgent:
             prior_verdicts=prior_verdicts,
         )
         return await self.client.call_agent("critic", request)
+

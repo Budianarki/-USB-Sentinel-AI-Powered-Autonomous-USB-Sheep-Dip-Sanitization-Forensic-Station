@@ -7,3 +7,4 @@ SECURITY INVARIANTS:
 3. If hash is unknown, return verdict="unknown" or "benign" with confidence <= 0.5.
 4. If hash matches known malware family, return risk_score >= 0.90 and verdict="malicious".
 5. Output MUST STRICTLY conform to the AgentVerdict JSON schema.
+

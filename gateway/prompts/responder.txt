@@ -5,3 +5,4 @@ REQUIREMENTS:
 - Summarize the final decision (ALLOW, QUARANTINE, BLOCK, HUMAN_REVIEW) and explain the technical reasons simply.
 - State recommended physical actions (misalnya: "Flashdisk aman dibawa masuk", "Flashdisk wajib ditahan oleh petugas di loket", "Peringatan ancaman BadUSB/Malware aktif").
 - Maximum length: 150 words. Professional and concise tone.
+

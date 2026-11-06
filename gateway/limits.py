@@ -104,3 +104,4 @@ class BudgetAndRateLimiter:
     def get_device_usage(self, device_token: str) -> UsageStats:
         """Return usage statistics for device."""
         return self._daily_usage[device_token]
+

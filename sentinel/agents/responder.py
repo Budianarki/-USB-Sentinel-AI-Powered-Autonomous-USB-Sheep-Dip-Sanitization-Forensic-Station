@@ -27,3 +27,4 @@ class ResponderAgent:
             ),
         )
         return await self.client.call_agent("responder", request)
+

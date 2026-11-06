@@ -57,3 +57,4 @@ def test_wrap_untrusted_data_formatting():
     assert wrapped.startswith("<metadata>")
     assert wrapped.endswith("</metadata>")
     assert "clean_content" in wrapped
+

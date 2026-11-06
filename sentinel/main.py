@@ -262,10 +262,12 @@ class SentinelStation:
             if (
                 self.orchestrator
                 and scan_res.file_features
-                and not scan_res.av_or_yara_hit
                 and (
                     self.config.agents.always_ai
-                    or any(self.orchestrator._is_file_gray(f) for f in scan_res.file_features)
+                    or (
+                        not scan_res.av_or_yara_hit
+                        and any(self.orchestrator._is_file_gray(f) for f in scan_res.file_features)
+                    )
                 )
             ):
                 self.state = "TRIAGE"

@@ -13,3 +13,4 @@ EVALUATION CRITERIA:
 - Packed PE sections / high entropy (>7.5) -> risk_score >= 0.70, verdict="suspicious"
 - Obfuscated scripts with eval/IEX/base64 -> risk_score >= 0.75, verdict="suspicious"
 - Benign text/images/clean docs without macros -> risk_score <= 0.15, verdict="benign"
+
