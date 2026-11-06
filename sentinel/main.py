@@ -5,7 +5,7 @@ import hashlib
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from sentinel.agents.schemas import SessionContext
 from sentinel.guard.usb_class import evaluate_device_class
@@ -60,6 +60,7 @@ class SentinelStation:
         scan_engine: ScanEngine | None = None,
         db_path: Path | str | None = None,
         telegram_notifier: TelegramNotifier | None = None,
+        orchestrator: Any | None = None,
     ) -> None:
         self.config = config
         self.usb_source = usb_source
@@ -80,6 +81,30 @@ class SentinelStation:
         if self.db_path:
             from sentinel.store.db import init_database
             init_database(self.db_path)
+
+        # AI Agent Layer Orchestrator (Fase 3)
+        if orchestrator is not None:
+            self.orchestrator = orchestrator
+        else:
+            try:
+                from gateway.app import app as gateway_app
+                from sentinel.agents.client import GatewayClient
+                from sentinel.agents.orchestrator import AgentOrchestrator
+                from sentinel.fusion.risk_fusion import RiskFusionEngine
+
+                asgi_app = gateway_app if self.config.mode == "laptop_mock" else None
+                client = GatewayClient(config=self.config.gateway, asgi_app=asgi_app)
+                fusion = RiskFusionEngine(agent_caps=self.policy_engine.config.agent_caps)
+                self.orchestrator = AgentOrchestrator(
+                    config=self.config.agents,
+                    gateway_client=client,
+                    risk_fusion=fusion,
+                    db_path=self.db_path,
+                )
+            except Exception as exc:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("Orchestrator initialization fallback: %s", exc)
+                self.orchestrator = None
 
         self.state: SentinelState = "IDLE"
         self.active_session_id: str | None = None
@@ -157,6 +182,29 @@ class SentinelStation:
             recent_events=0,
         )
 
+        # Initialize session in DB if persistence is active
+        if self.db_path:
+            try:
+                from sentinel.store.db import db_session
+                with db_session(self.db_path) as conn:
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO devices (fingerprint, first_seen, last_seen, reputation)
+                        VALUES (?, ?, ?, ?);
+                        """,
+                        (fingerprint, now_utc.isoformat(), now_utc.isoformat(), "unknown"),
+                    )
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO sessions (id, device_fingerprint, started_at, decision, risk, policy_version, ai_available)
+                        VALUES (?, ?, ?, ?, ?, ?, ?);
+                        """,
+                        (session_id, fingerprint, now_utc.isoformat(), "IN_PROGRESS", 0.0, self.policy_engine.config.version, 0),
+                    )
+            except Exception as db_init_err:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("Failed to initialize session in DB: %s", db_init_err)
+
         try:
             # 1. DEVICE_DETECTED
             self.state = "DEVICE_DETECTED"
@@ -205,7 +253,41 @@ class SentinelStation:
                 filesystem_type=getattr(mount_res, "filesystem_type", "vfat"),
             )
 
-            # 5. DECIDING (Layer 4)
+            # 5. TRIAGE (Layer 3 - AI Agent Layer)
+            ai_risk: float = 0.0
+            ai_reasons: list[str] = []
+            critic_disagreement: bool = False
+            ai_available: bool = True
+
+            if (
+                self.orchestrator
+                and scan_res.file_features
+                and not scan_res.av_or_yara_hit
+                and (
+                    self.config.agents.always_ai
+                    or any(self.orchestrator._is_file_gray(f) for f in scan_res.file_features)
+                )
+            ):
+                self.state = "TRIAGE"
+                triage_header = "[MOCK] TRIAGE" if self.config.mode == "laptop_mock" else "TRIAGE"
+                self.display.show(triage_header, ["AI Agent triage & risk analysis..."])
+                try:
+                    triage_res = await self.orchestrator.triage_session(
+                        session_id=session_id,
+                        files=scan_res.file_features,
+                        deterministic_risk=scan_res.deterministic_risk,
+                        context=_context,
+                    )
+                    ai_risk = triage_res.ai_risk
+                    ai_reasons = triage_res.ai_reasons
+                    critic_disagreement = triage_res.critic_disagreement
+                    ai_available = triage_res.ai_available
+                except Exception as triage_err:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).warning("AI triage failed (fail-closed): %s", triage_err)
+                    ai_available = False
+
+            # 6. DECIDING (Layer 4)
             self.state = "DECIDING"
             if (
                 len(scan_res.file_features) == 0
@@ -223,10 +305,27 @@ class SentinelStation:
                     scanners_ok=scan_res.scanners_ok,
                     filesystem_supported=scan_res.filesystem_supported,
                     deterministic_risk=scan_res.deterministic_risk,
+                    ai_risk=ai_risk,
+                    critic_disagreement=critic_disagreement,
                     has_risky_type=scan_res.has_risky_type,
+                    ai_available=ai_available,
                     av_or_yara_hit=scan_res.av_or_yara_hit,
                     deterministic_reasons=scan_res.deterministic_reasons,
+                    ai_reasons=ai_reasons,
                 )
+
+            # Optional: Responder agent explanation
+            if self.orchestrator and "responder" in self.config.agents.enabled and ai_available:
+                try:
+                    resp_out = await self.orchestrator.responder.generate_incident_report(
+                        decision=decision,
+                        context=_context,
+                    )
+                    if resp_out.status == "success" and resp_out.report_text:
+                        decision.ai_reasons.append(f"AI: {resp_out.report_text}")
+                except Exception as resp_err:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).debug("Responder report skipped: %s", resp_err)
 
             await self._report_and_cleanup(device, decision)
             return decision
@@ -282,6 +381,28 @@ class SentinelStation:
         # Record event in tamper-evident hashchain if db_path is configured
         if self.db_path:
             try:
+                from sentinel.store.db import db_session
+                with db_session(self.db_path) as conn:
+                    conn.execute(
+                        """
+                        UPDATE sessions
+                        SET ended_at = ?, decision = ?, risk = ?, policy_version = ?, ai_available = ?
+                        WHERE id = ?;
+                        """,
+                        (
+                            datetime.now(UTC).isoformat(),
+                            decision.action,
+                            decision.risk,
+                            decision.policy_version,
+                            int(decision.ai_available),
+                            decision.session_id,
+                        ),
+                    )
+            except Exception as exc:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("Failed to update session in DB: %s", exc)
+
+            try:
                 from sentinel.store.hashchain import record_event
                 record_event(
                     self.db_path,
@@ -333,6 +454,7 @@ def create_station(
     config_path: str | Path | None = None,
     db_path: Path | str | None = None,
     telegram_notifier: TelegramNotifier | None = None,
+    orchestrator: Any | None = None,
 ) -> SentinelStation:
     """Factory creating SentinelStation based on configuration mode."""
     cfg = load_sentinel_config(config_path)
@@ -362,4 +484,5 @@ def create_station(
         door_lock=door_lock,
         db_path=db_path,
         telegram_notifier=telegram_notifier,
+        orchestrator=orchestrator,
     )

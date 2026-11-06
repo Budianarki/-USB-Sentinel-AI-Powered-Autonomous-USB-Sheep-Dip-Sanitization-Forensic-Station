@@ -159,16 +159,16 @@ class PolicyEngine:
             reasons_det.append(
                 "Critic agent disagreed with analysis verdict; escalating to human review"
             )
+        elif has_risky_type and not ai_available:
+            # Invariant 2: Fail closed
+            action = "QUARANTINE"
+            reasons_det.append("Risky file type present but AI analyst unavailable (fail-closed)")
         elif final_risk >= t_review:
             action = "HUMAN_REVIEW"
             if not reasons_det and not reasons_ai:
                 reasons_det.append(
                     f"Risk score ({final_risk:.2f}) exceeds review threshold ({t_review})"
                 )
-        elif has_risky_type and not ai_available:
-            # Invariant 2: Fail closed
-            action = "QUARANTINE"
-            reasons_det.append("Risky file type present but AI analyst unavailable (fail-closed)")
         elif (
             scan_complete
             and scanners_ok

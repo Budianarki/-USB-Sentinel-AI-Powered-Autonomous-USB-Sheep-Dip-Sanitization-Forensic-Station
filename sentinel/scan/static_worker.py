@@ -49,24 +49,24 @@ def run_worker() -> None:
 
     tool = args.tool
     # 2. Targeted or auto static analysis based on detected type
-    if tool in ("pe", "all") or (tool == "all" and type_res.detected_type in ("pe", "elf")):
+    if tool == "pe" or (tool == "all" and type_res.detected_type in ("pe", "elf")):
         pe_summary = analyze_pe(file_path)
         result["static_summary"]["pe"] = pe_summary
         result["flags"].extend(pe_summary.get("flags", []))
 
-    if tool in ("office", "all") or (
+    if tool == "office" or (
         tool == "all" and type_res.detected_type in ("docx", "xlsx", "pptx", "ole_compound")
     ):
         office_summary = analyze_office(file_path)
         result["static_summary"]["office"] = office_summary
         result["flags"].extend(office_summary.get("flags", []))
 
-    if tool in ("pdf", "all") or (tool == "all" and type_res.detected_type == "pdf"):
+    if tool == "pdf" or (tool == "all" and type_res.detected_type == "pdf"):
         pdf_summary = analyze_pdf(file_path)
         result["static_summary"]["pdf"] = pdf_summary
         result["flags"].extend(pdf_summary.get("flags", []))
 
-    if tool in ("script", "all") or (tool == "all" and type_res.detected_type == "script"):
+    if tool == "script" or (tool == "all" and type_res.detected_type == "script"):
         script_summary = analyze_script(file_path)
         result["static_summary"]["script"] = script_summary
         result["flags"].extend(script_summary.get("flags", []))
