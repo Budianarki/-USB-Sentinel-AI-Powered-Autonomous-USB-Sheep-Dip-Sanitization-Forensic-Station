@@ -123,7 +123,12 @@ class ScanEngine:
             )
 
         entries = list(mount_point.rglob("*"))
-        regular_files = [f for f in entries if f.is_file() or f.is_symlink()]
+        regular_files = [
+            f
+            for f in entries
+            if (f.is_file() or f.is_symlink())
+            and not any(part.startswith((".sentinel_quarantine", ".Trash")) for part in f.parts)
+        ]
 
         if len(regular_files) > self.config.scan.max_files:
             scan_complete = False

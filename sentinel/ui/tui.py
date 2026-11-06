@@ -28,6 +28,7 @@ from sentinel.scan.engine import ScanEngine
 from sentinel.scan.yara_scanner import MockYaraScanner
 from sentinel.store.db import db_session, init_database
 from sentinel.store.hashchain import export_head, verify_hashchain
+from sentinel.ui.cleaner import sanitize_flashdisk
 from sentinel.ui.device_scanner import list_connected_usb_devices
 from sentinel.util.config import PolicyConfig, SentinelConfig
 
@@ -36,7 +37,7 @@ DB_PATH = Path("sentinel_audit.db")
 init_database(DB_PATH)
 
 
-async def execute_scan(target_device: dict) -> None:
+async def execute_scan(target_device: dict) -> tuple[str, list[str]]:
     mount_dir = Path(target_device["mount_point"])
     console.print("\n[bold cyan]⚡ MEMULAI PEMERIKSAAN 4-LAYER SENTINEL...[/bold cyan]")
 
@@ -143,8 +144,11 @@ async def execute_scan(target_device: dict) -> None:
     files_table.add_column("Status", justify="center")
 
     scan_res = station.scan_engine.scan_mount(mount_dir)
+    bad_files: list[str] = []
     for f in scan_res.file_features:
         is_bad = bool(f.av_hits or f.yara_hits or f.ext_mismatch or any("macro" in fl for fl in f.flags))
+        if is_bad and f.sanitized_name:
+            bad_files.append(f.sanitized_name)
         status_text = "[bold red]THREAT[/bold red]" if is_bad else "[bold green]CLEAN[/bold green]"
         flags_str = ", ".join(f.flags + f.av_hits + f.yara_hits) or "-"
         files_table.add_row(
@@ -199,6 +203,8 @@ async def execute_scan(target_device: dict) -> None:
     chain_status = "[bold green]VALID / UTUH[/bold green]" if valid else "[bold red]RUSAK[/bold red]"
     console.print(f"[dim]🔒 SQLite Hash Chain: {chain_status} | Events: {count} | Head: {head_hash[:24]}...[/dim]\n")
 
+    return decision.action, bad_files
+
 
 def run_tui() -> None:
     console.clear()
@@ -233,8 +239,23 @@ def run_tui() -> None:
                 console.print("[yellow]Keluar dari stasiun Sentinel. Sampai jumpa![/yellow]")
                 break
 
-            asyncio.run(execute_scan(dev))
-            input("Tekan [ENTER] untuk kembali ke pemantauan port USB...")
+            action, threats = asyncio.run(execute_scan(dev))
+            if action == "BLOCK" and threats:
+                console.print(f"[bold red]⚠️  Terdeteksi {len(threats)} berkas berbahaya pada flashdisk![/bold red]")
+                c_clean = input("👉 Ketik [C] untuk Bersihkan & Netralkan Flashdisk Sekarang (atau [ENTER] untuk Lewati): ").strip()
+                if c_clean.lower() == "c":
+                    with console.status("[bold green]Mengisolasi berkas jahat ke .sentinel_quarantine dan membersihkan flashdisk..."):
+                        res = sanitize_flashdisk(
+                            mount_point=Path(dev["mount_point"]),
+                            dangerous_file_names=threats,
+                            action="quarantine",
+                            db_path=DB_PATH,
+                        )
+                    console.print(f"[bold green]✓ Selesai! {len(res['quarantined'])} berkas berhasil diisolasi ke karantina.[/bold green]")
+                    console.print("[bold cyan]Memverifikasi ulang keamanan flashdisk...[/bold cyan]")
+                    asyncio.run(execute_scan(dev))
+
+            input("\nTekan [ENTER] untuk kembali ke pemantauan port USB...")
             console.clear()
 
         except (KeyboardInterrupt, EOFError):

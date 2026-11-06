@@ -62,6 +62,25 @@ def list_connected_usb_devices() -> list[dict[str, Any]]:
                         active_mount = str(candidate)
                         break
 
+            # Fallback auto-mount if device is plugged but unmounted
+            if not active_mount and node:
+                import subprocess
+                try:
+                    res = subprocess.run(
+                        ["udisksctl", "mount", "-b", node, "--no-user-interaction"],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        timeout=3,
+                    )
+                    if res.returncode == 0:
+                        for word in res.stdout.strip().split():
+                            if word.startswith(("/media", "/run/media", "/mnt")):
+                                active_mount = word
+                                break
+                except Exception as mount_exc:  # noqa: BLE001
+                    logger.debug("Auto-mount fallback failed: %s", mount_exc)
+
             devices.append({
                 "node": node,
                 "vendor": vendor,
