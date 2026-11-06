@@ -60,3 +60,4 @@ dmypy.json
 *.db
 /data/
 /quarantine/
+.nyxstrike_data/
