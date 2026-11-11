@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USB Sentinel 2.5 - Sheep-Dip Physical Sanitization & AI Multi-Agent Station</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/claymorphism.css">
+</head>
+<body class="min-h-screen antialiased selection:bg-cyan-400 selection:text-black pb-16">
+
+  <!-- TOP APP BAR -->
+  <header class="max-w-7xl mx-auto px-4 pt-6 sm:px-6 lg:px-8">
+    <div class="clay-card p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <!-- Clay Logo Emblem -->
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white font-black text-2xl" style="box-shadow: 6px 8px 16px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(255,255,255,0.4), inset -2px -2px 4px rgba(0,0,0,0.3);">
+          🛡️
+        </div>
+        <div>
+          <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-black tracking-tight text-white">USB SENTINEL <span class="text-cyan-400">2.5</span></h1>
+            <span class="clay-pill bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              MODULAR FRAMEWORK EDITION
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium mt-0.5">Stasiun Sanitasi Flashdisk Terisolasi & AI Multi-Agent Triage Pertahanan Siber</p>
+        </div>
+      </div>
+
+      <!-- Controls: Audio, Status, Daemon Clock -->
+      <div class="flex items-center gap-3 self-end md:self-auto">
+        <button id="audio-toggle" onclick="toggleAudio()" class="clay-btn clay-btn-neutral text-xs px-4 py-2.5">
+          <span id="audio-icon">🔊</span>
+          <span id="audio-label">Beeper: Aktif</span>
+        </button>
+
+        <div class="clay-inset px-4 py-2 text-right hidden sm:block">
+          <div class="text-[11px] text-cyan-300 font-mono font-bold" id="clock-display">--:--:--</div>
+          <div class="text-[10px] text-emerald-400 flex items-center gap-1.5 justify-end font-semibold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Stasiun Standby
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLAY NAVIGATION TABS -->
+    <nav class="mt-6 flex flex-wrap gap-3">
+      <button onclick="switchTab('tab-scanner')" id="btn-tab-scanner" class="clay-btn clay-btn-cyan text-xs px-5 py-3">
+        🛡️ Stasiun Pemindai & Pembersih
+      </button>
+      <button onclick="switchTab('tab-war-room')" id="btn-tab-war-room" class="clay-btn clay-btn-neutral text-xs px-5 py-3">
+        🤖 Ruang Sidang AI (War Room)
+      </button>
+      <button onclick="switchTab('tab-forensics')" id="btn-tab-forensics" class="clay-btn clay-btn-neutral text-xs px-5 py-3">
+        🔬 Laboratorium Forensik
+      </button>
+      <button onclick="switchTab('tab-vault')" id="btn-tab-vault" class="clay-btn clay-btn-neutral text-xs px-5 py-3">
+        🧹 Pusat Sanitasi & Karantina
+      </button>
+      <button onclick="switchTab('tab-cert')" id="btn-tab-cert" class="clay-btn clay-btn-neutral text-xs px-5 py-3">
+        📜 Sertifikat Kepatuhan
+      </button>
+      <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="clay-btn clay-btn-neutral text-xs px-5 py-3">
+        ⚙️ Pengaturan AI & API Key
+      </button>
+    </nav>
+  </header>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 mt-6 sm:px-6 lg:px-8 space-y-6">
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: SCANNER & USB CLEANER (STASIUN UTAMA) -->
+    <!-- ============================================================= -->
+    <div id="tab-scanner" class="space-y-6">
+
+      <!-- 3D CLAY HARDWARE DOCK & REALTIME MONITOR -->
+      <section class="clay-card p-6 md:p-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+
+          <!-- 3D Clay Physical USB Socket Visualization -->
+          <div class="lg:col-span-4 flex flex-col items-center justify-center">
+            <div class="usb-dock w-full max-w-xs flex flex-col items-center justify-center p-6 space-y-4">
+              <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Port USB Sanitasi (Fisik)</span>
+
+              <div id="usb-graphic-box" class="relative w-48 h-36 flex items-center justify-center">
+                <!-- Disconnected State -->
+                <div id="usb-disconnected-view" class="flex flex-col items-center space-y-2">
+                  <div class="w-24 h-12 rounded-xl bg-slate-900 border-2 border-dashed border-amber-500/50 flex items-center justify-center text-xl shadow-inner">
+                    🔌
+                  </div>
+                  <span class="text-xs font-bold text-amber-400 animate-pulse">0 Perangkat Terhubung</span>
+                </div>
+
+                <!-- Connected State -->
+                <div id="usb-connected-view" class="hidden flex flex-col items-center space-y-2 animate-bounce">
+                  <div class="w-28 h-14 flashdisk-clay-body flex items-center justify-between px-3 text-white">
+                    <span class="text-xs font-black">USB</span>
+                    <div class="w-4 h-6 flashdisk-clay-connector"></div>
+                  </div>
+                  <span class="text-xs font-black text-emerald-400" id="disk-model-text">Cruzer Blade</span>
+                </div>
+              </div>
+
+              <!-- BadUSB Shield Badge -->
+              <div class="clay-pill bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 text-[10px]">
+                <span>🛡️</span> Interface 0x08 Mass Storage Terisolasi (BadUSB Safe)
+              </div>
+            </div>
+          </div>
+
+          <!-- Hardware Telemetry & Action Panel -->
+          <div class="lg:col-span-8 space-y-5">
+            <div class="space-y-2">
+              <div class="flex items-center gap-3">
+                <span id="device-badge" class="clay-pill bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                  <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block mr-1"></span> 0 Perangkat USB Terhubung
+                </span>
+                <button onclick="checkDevices(true)" class="clay-btn clay-btn-neutral text-xs px-3 py-1.5 flex items-center gap-1">
+                  <span id="refresh-spinner">🔄</span> Segarkan Port
+                </button>
+              </div>
+
+              <h2 id="device-title" class="text-2xl font-black text-white">Menunggu Flashdisk Dicolokkan...</h2>
+              <p id="device-subtitle" class="text-xs text-slate-400 leading-relaxed">
+                Port USB stasiun dalam kondisi standby. Silakan tancapkan flashdisk ke stasiun sanitasi.
+              </p>
+            </div>
+
+            <!-- Hardware Spec Tags -->
+            <div id="device-meta-tags" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+              <div class="clay-inset p-3">
+                <span class="text-[10px] text-slate-500 block">Device Node:</span>
+                <span id="meta-node" class="text-cyan-300 font-bold">--</span>
+              </div>
+              <div class="clay-inset p-3">
+                <span class="text-[10px] text-slate-500 block">Filesystem UUID:</span>
+                <span id="meta-uuid" class="text-indigo-300 font-bold truncate block">--</span>
+              </div>
+              <div class="clay-inset p-3">
+                <span class="text-[10px] text-slate-500 block">Kapasitas:</span>
+                <span id="meta-size" class="text-emerald-300 font-bold">-- GB</span>
+              </div>
+              <div class="clay-inset p-3">
+                <span class="text-[10px] text-slate-500 block">Serial Number:</span>
+                <span id="meta-serial" class="text-amber-300 font-bold truncate block">--</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="pt-3 flex flex-wrap gap-4">
+              <button id="btn-start-scan" onclick="startScan()" disabled class="clay-btn clay-btn-cyan text-sm px-7 py-4 opacity-50 cursor-not-allowed">
+                <span>⚡</span> MULAI SCAN SENTINEL
+              </button>
+              <button id="btn-auto-clean" onclick="startClean('quarantine')" class="hidden clay-btn clay-btn-danger text-sm px-7 py-4 animate-pulse">
+                <span>🧹</span> BERSIHKAN FLASHDISK (DISINFECTION)
+              </button>
+            </div>
+
+            <!-- Scan Progress Bar -->
+            <div id="scan-progress-box" class="hidden space-y-2 pt-2">
+              <div class="flex justify-between text-xs text-slate-300 font-mono">
+                <span id="scan-step-label">Layer 1: Device Guard memvalidasi antarmuka USB Mass Storage...</span>
+                <span id="scan-pct-label" class="font-bold text-cyan-400">25%</span>
+              </div>
+              <div class="clay-inset h-3.5 p-0.5 rounded-full overflow-hidden">
+                <div id="scan-progress-bar" class="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-emerald-400 rounded-full transition-all duration-300" style="width: 25%;"></div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- RESULTS SECTION (POPULATED AFTER SCAN) -->
+      <section id="results-view" class="hidden space-y-6">
+
+        <!-- Decision Banner & Radial Gauge -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          <!-- Decision Card -->
+          <div id="card-decision" class="lg:col-span-8 clay-card p-6 md:p-8 flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-extrabold uppercase tracking-widest text-slate-400">Vonis Resmi Policy Engine (Layer 4)</span>
+                <span id="badge-decision" class="clay-pill bg-red-500/20 text-red-300 border border-red-500/40 text-sm">
+                  BLOCK
+                </span>
+              </div>
+
+              <h3 id="text-decision-title" class="text-3xl font-black text-white">FLASHDISK BERBAHAYA! DILARANG MASUK</h3>
+              <p id="text-decision-desc" class="text-xs text-slate-300 leading-relaxed">
+                Ditemukan berkas macro autoexec, pemalsuan biner PE berkedok PDF, atau indikasi malware aktif.
+              </p>
+
+              <!-- Primary Reasons Container -->
+              <div class="clay-inset p-4 rounded-2xl space-y-2">
+                <div class="text-[11px] font-black uppercase tracking-wider text-slate-400">Temuan Ancaman Kritis:</div>
+                <ul id="list-reasons" class="text-xs space-y-1.5 font-medium"></ul>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
+              <div>Sesi ID: <code id="txt-session-id" class="text-cyan-300 font-mono font-bold">--</code></div>
+              <div>Durasi Inspeksi: <strong id="txt-duration" class="text-white">--</strong></div>
+              <div>Audit Rantai SHA256: <strong id="txt-audit-status" class="text-emerald-400">VALID / UTUH</strong></div>
+            </div>
+          </div>
+
+          <!-- Risk Score Clay Gauge & Physical LED Status -->
+          <div class="lg:col-span-4 clay-card p-6 flex flex-col items-center justify-between text-center space-y-4">
+            <span class="text-xs font-black uppercase tracking-widest text-slate-400">Skor Risiko Terkalibrasi (Noisy-OR)</span>
+
+            <!-- Radial Circle Meter with Clay Depth -->
+            <div class="relative my-2 flex items-center justify-center">
+              <svg class="w-44 h-44 transform -rotate-90">
+                <circle cx="88" cy="88" r="72" stroke="currentColor" stroke-width="14" class="text-slate-800/80" fill="transparent" />
+                <circle id="gauge-circle" cx="88" cy="88" r="72" stroke="currentColor" stroke-width="14" class="text-red-500 transition-all duration-1000" fill="transparent" stroke-dasharray="452" stroke-dashoffset="0" stroke-linecap="round" />
+              </svg>
+              <div class="absolute flex flex-col items-center justify-center text-center">
+                <span id="gauge-score" class="text-5xl font-black text-white font-mono">1.00</span>
+                <span id="gauge-label" class="text-[11px] font-bold text-red-400 uppercase tracking-widest mt-1">RISIKO KRITIS</span>
+              </div>
+            </div>
+
+            <!-- Physical Station LED Bulb Simulation -->
+            <div class="w-full clay-inset p-3 rounded-2xl flex items-center justify-between text-xs">
+              <span class="text-slate-400 font-semibold">Indikator LED Fisik:</span>
+              <div class="flex items-center gap-2">
+                <span id="led-bulb" class="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_12px_rgba(244,63,94,1)] animate-ping"></span>
+                <span id="led-text" class="font-black text-red-400">MERAH (ALARM)</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Scanned Files Interactive Table -->
+        <div class="clay-card p-6 md:p-8 space-y-5">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-3">
+                <h3 class="text-lg font-black text-white">Daftar Berkas Terdeteksi di Flashdisk</h3>
+                <span id="threat-count-badge" class="clay-pill bg-red-500/20 text-red-300">0 Ancaman</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Klik tombol "Forensik" pada berkas manapun untuk memeriksa Hex dump, Entropi, dan String.</p>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto clay-inset p-2 rounded-2xl">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400">
+                  <th class="py-3 px-4 font-bold">Nama Berkas</th>
+                  <th class="py-3 px-4 font-bold">Tipe Magic</th>
+                  <th class="py-3 px-4 font-bold">Ukuran</th>
+                  <th class="py-3 px-4 font-bold">Entropi</th>
+                  <th class="py-3 px-4 font-bold">Status</th>
+                  <th class="py-3 px-4 font-bold text-right">Aksi Forensik</th>
+                </tr>
+              </thead>
+              <tbody id="table-files-body" class="divide-y divide-slate-800/60 font-mono"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: AI AGENT WAR ROOM & DELIBERATION -->
+    <!-- ============================================================= -->
+    <div id="tab-war-room" class="hidden space-y-6">
+      <div class="clay-card p-6 md:p-8 space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">🤖</span>
+              <h2 class="text-2xl font-black text-white">Ruang Sidang Tim AI Agent (Layer 3)</h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Multi-agent adversarial consensus: Static Analyst, Threat Intel, Red Team Critic, dan Responder.</p>
+          </div>
+          <div class="clay-inset px-4 py-2 text-right">
+            <span class="text-[10px] text-slate-400 uppercase font-bold">Konsensus Tim</span>
+            <div class="text-sm font-black text-indigo-400">98.4% Tingkat Keyakinan</div>
+          </div>
+        </div>
+
+        <!-- AI Debate Flow Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" id="war-room-dialogs"></div>
+
+        <!-- Official Responder Verdict Summary Box -->
+        <div class="clay-card p-6 space-y-2 border border-indigo-500/20">
+          <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-400">
+            <span>📢</span> Rekomendasi Resmi Responder AI (Bahasa Indonesia)
+          </div>
+          <p id="txt-war-room-responder" class="text-xs text-slate-300 leading-relaxed font-sans">
+            Menunggu jalannya scan untuk mengevaluasi ringkasan insiden...
+          </p>
+        </div>
+
+        <!-- Agent Telemetry Economy Table -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-black text-white uppercase tracking-wider">Telemetri & Biaya Komputasi Agent (SQLite 'agent_runs')</h3>
+          <div class="overflow-x-auto clay-inset p-2 rounded-2xl">
+            <table class="w-full text-left text-xs font-mono">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400">
+                  <th class="py-2.5 px-3">Agent</th>
+                  <th class="py-2.5 px-3">Model</th>
+                  <th class="py-2.5 px-3">Tokens Total</th>
+                  <th class="py-2.5 px-3">Latensi</th>
+                  <th class="py-2.5 px-3">Estimasi Biaya ($)</th>
+                  <th class="py-2.5 px-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="agent-telemetry-body" class="divide-y divide-slate-800/60"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 3: DEEP FORENSICS (HEX & ENTROPY) -->
+    <!-- ============================================================= -->
+    <div id="tab-forensics" class="hidden space-y-6">
+      <div class="clay-card p-6 md:p-8 space-y-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🔬</span>
+            <h2 class="text-2xl font-black text-white">Laboratorium Forensik Digital Berkas</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Analisis mendalam struktur biner: Hex Dump, Spektrum Entropi Shannon, dan String Extraction.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          <!-- File Selector List -->
+          <div class="lg:col-span-4 clay-inset p-4 rounded-2xl space-y-2">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pilih Berkas untuk Diinspeksi:</div>
+            <div id="forensic-file-list" class="space-y-1.5 max-h-96 overflow-y-auto"></div>
+          </div>
+
+          <!-- Forensic Detail Workspace -->
+          <div class="lg:col-span-8 space-y-5">
+            <div class="clay-card p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 id="forensic-active-name" class="text-sm font-black text-cyan-300 font-mono">Pilih berkas dari daftar di samping</h3>
+                <span id="forensic-active-size" class="clay-pill bg-slate-800 text-slate-300">-- B</span>
+              </div>
+
+              <!-- Entropy Bar Visualizer -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px] text-slate-400">
+                  <span>Distribusi Entropi per Blok (0.0 = Datar, 8.0 = Terenkripsi/Packed):</span>
+                  <span id="forensic-total-entropy" class="font-bold text-white font-mono">Entropi: --</span>
+                </div>
+                <div id="entropy-bars-container" class="h-8 clay-inset p-1 rounded-xl flex items-end gap-1"></div>
+              </div>
+            </div>
+
+            <!-- Hex Dump View -->
+            <div class="clay-inset p-4 rounded-2xl space-y-2">
+              <div class="text-[10px] text-slate-400 uppercase font-mono font-bold">Offset (Hex) | Bytes Hexadecimal | Karakter ASCII</div>
+              <pre id="forensic-hex-view" class="text-[11px] font-mono text-cyan-400/90 leading-tight max-h-64 overflow-y-auto bg-transparent p-0 select-text"></pre>
+            </div>
+
+            <!-- Suspicious Strings Found -->
+            <div class="clay-card p-5 space-y-2">
+              <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">String & Pola Heuristik yang Ditemukan:</div>
+              <div id="forensic-strings-box" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto"></div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 4: DISINFECTION VAULT & QUARANTINE -->
+    <!-- ============================================================= -->
+    <div id="tab-vault" class="hidden space-y-6">
+      <div class="clay-card p-6 md:p-8 space-y-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🧹</span>
+            <h2 class="text-2xl font-black text-white">Pusat Sanitasi & Karantina ('Pembersih Flashdisk')</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Mengisolasi malware ke brankas terisolasi, membersihkan virus shortcut (Ramnit), dan memulihkan berkas asli pengguna.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- Quarantine Disinfection Card -->
+          <div class="clay-card p-6 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-lg font-black">🛡️</div>
+              <div>
+                <h3 class="text-base font-black text-white">Sanitasi Flashdisk Aman (Karantina)</h3>
+                <p class="text-xs text-slate-400">Pindahkan ancaman ke <code>.sentinel_quarantine</code> dengan atribut inert 000.</p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Metode ini mengamankan seluruh berkas berbahaya tanpa menghapus data secara permanen, sehingga dokumen asli Anda tetap aman dan dapat diakses kembali.
+            </p>
+            <button onclick="startClean('quarantine')" class="clay-btn clay-btn-clean text-xs px-6 py-3 w-full">
+              🧹 JALANKAN SANITASI SEKARANG
+            </button>
+          </div>
+
+          <!-- Restore / Undo Card -->
+          <div class="clay-card p-6 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-lg font-black">🔄</div>
+              <div>
+                <h3 class="text-base font-black text-white">Pemulihan Uji Coba (Restore)</h3>
+                <p class="text-xs text-slate-400">Kembalikan berkas dari folder karantina untuk keperluan pengujian ulang.</p>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Memulihkan kembali berkas yang telah dikarantina ke partisi aktif agar Anda dapat menguji ulang skenario deteksi multi-layer.
+            </p>
+            <button onclick="restoreQuarantine()" class="clay-btn clay-btn-neutral text-xs px-6 py-3 w-full">
+              🔄 PULIHKAN DARI KARANTINA
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Disinfection Log History -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-black text-white uppercase tracking-wider">Log Tindakan Sanitasi Terakhir</h3>
+          <div id="clean-log-box" class="clay-inset p-4 rounded-2xl text-xs font-mono text-slate-300 space-y-1">
+            Belum ada aksi pembersihan yang dijalankan pada sesi ini.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 5: COMPLIANCE AUDIT CERTIFICATE -->
+    <!-- ============================================================= -->
+    <div id="tab-cert" class="hidden space-y-6">
+      <div class="clay-card p-6 md:p-8 space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">📜</span>
+              <h2 class="text-2xl font-black text-white">Sertifikat Kepatuhan Sanitasi Media</h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Standar ISO/IEC 27001:2022 & NIST SP 800-88 Rev.1 Verifiable Certificate</p>
+          </div>
+          <button onclick="window.print()" class="clay-btn clay-btn-cyan text-xs px-4 py-2">
+            🖨️ Cetak / Unduh PDF
+          </button>
+        </div>
+
+        <!-- Certificate Formal Box -->
+        <div id="certificate-box" class="clay-card p-8 space-y-6 border border-emerald-500/30 bg-slate-900/90 font-mono text-xs">
+          <div class="text-center space-y-2 border-b border-slate-800 pb-4">
+            <div class="text-base font-black text-emerald-400">OFFICIAL CERTIFICATE OF SANITIZATION & INSPECTION</div>
+            <div class="text-[11px] text-slate-400">USB SENTINEL AIR-GAPPED HARDWARE DEFENSE SYSTEM</div>
+            <div id="cert-id" class="text-xs text-white font-bold">CERT-SENTINEL-STANDBY</div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-slate-500">Target Device Node:</div>
+              <div id="cert-device-node" class="text-white font-bold">--</div>
+            </div>
+            <div>
+              <div class="text-slate-500">Hardware Serial:</div>
+              <div id="cert-serial" class="text-white font-bold">--</div>
+            </div>
+            <div>
+              <div class="text-slate-500">Timestamp Audit:</div>
+              <div id="cert-timestamp" class="text-white font-bold">--</div>
+            </div>
+            <div>
+              <div class="text-slate-500">Policy Engine Verdict:</div>
+              <div id="cert-verdict" class="text-emerald-400 font-bold">--</div>
+            </div>
+            <div class="md:col-span-2">
+              <div class="text-slate-500">Cryptographic Hash Chain Head (SHA-256):</div>
+              <div id="cert-head-hash" class="text-cyan-300 font-bold break-all">--</div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-800 pt-4 flex items-center justify-between text-[11px] text-slate-400 font-sans">
+            <div>Divalidasi Oleh: <strong>USB Sentinel Station Daemon</strong></div>
+            <div class="text-emerald-400 font-bold">✓ INTEGRITAS DIGITAL TERSEGEL</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 6: AI PROVIDER & API KEY CONFIGURATION (NEW!) -->
+    <!-- ============================================================= -->
+    <div id="tab-settings" class="hidden space-y-6">
+      <div class="clay-card p-6 md:p-8 space-y-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">⚙️</span>
+            <h2 class="text-2xl font-black text-white">Pengaturan Universal AI Provider & API Key</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            Pilih dan tempel API Key untuk mesin analisis AI Sentinel. Mendukung Google Gemini, OpenAI, Groq Llama-3, Anthropic Claude, atau Ollama Local (100% Offline).
+          </p>
+        </div>
+
+        <!-- Provider Status Overview Grid -->
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Status Seluruh Provider AI:</h3>
+          <div id="ai-providers-overview" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- Active Provider Configuration Form -->
+        <div class="clay-card p-6 space-y-5 border border-cyan-500/20">
+          <h3 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <span>🔑</span> Konfigurasi Provider Aktif
+          </h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Provider Selection -->
+            <div class="space-y-1.5">
+              <label class="text-xs font-bold text-slate-300">Pilih Provider AI:</label>
+              <select id="select-ai-provider" onchange="onProviderSelectChange()" class="w-full clay-inset p-3 rounded-xl text-xs text-cyan-300 font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                <option value="gemini">Google Gemini (Sangat Cepat & Efisien)</option>
+                <option value="groq">Groq (Llama-3.3 Ultra-Fast Inference)</option>
+                <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                <option value="anthropic">Anthropic Claude (3.5 Sonnet)</option>
+                <option value="ollama">Ollama (100% Offline / Air-Gapped Local)</option>
+                <option value="mock">Deterministic Mock (Testing Tanpa Internet)</option>
+              </select>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="space-y-1.5">
+              <label class="text-xs font-bold text-slate-300">Pilih Model:</label>
+              <select id="select-ai-model" class="w-full clay-inset p-3 rounded-xl text-xs text-slate-200 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500"></select>
+            </div>
+
+            <!-- API Key Input -->
+            <div class="md:col-span-2 space-y-1.5">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-bold text-slate-300">API Key:</label>
+                <span id="help-ai-api-key" class="text-[11px] text-slate-400"></span>
+              </div>
+              <input type="password" id="input-ai-api-key" placeholder="Tempel API Key baru di sini..." class="w-full clay-inset p-3 rounded-xl text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </div>
+          </div>
+
+          <!-- Action & Status Buttons -->
+          <div class="pt-3 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+              <button onclick="saveAISettings()" class="clay-btn clay-btn-cyan text-xs px-6 py-2.5">
+                💾 Simpan & Aktifkan
+              </button>
+              <button onclick="testCurrentAIConnection()" class="clay-btn clay-btn-neutral text-xs px-5 py-2.5">
+                🔌 Uji Koneksi API
+              </button>
+            </div>
+            <div id="ai-settings-status-msg" class="text-xs font-semibold"></div>
+          </div>
+        </div>
+
+        <!-- Threat Intelligence & Signature Feed Section (MalwareBazaar & vx-underground) -->
+        <div class="clay-card p-6 space-y-5 border border-purple-500/20">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <span>🛡️</span> Intelijen Ancaman MalwareBazaar & vx-underground
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Database reputasi hash in-the-wild (RaspberryRobin, Ramnit, LockBit, RedLine) & Signature Arsenal YARA USB Sentinel.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="syncThreatIntel()" id="btn-sync-intel" class="clay-btn clay-btn-cyan text-xs px-4 py-2">
+                🔄 Sinkronisasi Intelijen
+              </button>
+              <button onclick="seedThreatFeeds()" class="clay-btn clay-btn-neutral text-xs px-4 py-2">
+                🌱 Muat Signature Bawaan
+              </button>
+            </div>
+          </div>
+
+          <!-- Stats Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="clay-card p-4 text-center">
+              <div class="text-[10px] uppercase font-bold text-slate-400">Total Hash Terdaftar</div>
+              <div id="intel-total-hashes" class="text-xl font-black text-white font-mono mt-1">--</div>
+            </div>
+            <div class="clay-card p-4 text-center">
+              <div class="text-[10px] uppercase font-bold text-rose-400">Malware Teridentifikasi</div>
+              <div id="intel-bad-hashes" class="text-xl font-black text-rose-400 font-mono mt-1">--</div>
+            </div>
+            <div class="clay-card p-4 text-center">
+              <div class="text-[10px] uppercase font-bold text-emerald-400">Hash Terverifikasi Aman</div>
+              <div id="intel-good-hashes" class="text-xl font-black text-emerald-400 font-mono mt-1">--</div>
+            </div>
+            <div class="clay-card p-4 text-center">
+              <div class="text-[10px] uppercase font-bold text-purple-400">Aturan YARA Aktif</div>
+              <div id="intel-yara-rules" class="text-xl font-black text-purple-400 font-mono mt-1">--</div>
+            </div>
+          </div>
+
+          <!-- MalwareBazaar API Key Input -->
+          <div class="space-y-1.5 pt-2 border-t border-slate-800">
+            <div class="flex justify-between items-center">
+              <label class="text-xs font-bold text-slate-300">MalwareBazaar Auth-Key (Opsional untuk Online Query):</label>
+              <a href="https://auth.abuse.ch/" target="_blank" class="text-[11px] text-cyan-400 underline hover:text-cyan-300">Dapatkan Auth-Key Gratis</a>
+            </div>
+            <div class="flex gap-3">
+              <input type="password" id="input-mb-api-key" placeholder="Tempel MalwareBazaar Auth-Key..." class="flex-1 clay-inset p-3 rounded-xl text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-purple-500">
+              <button onclick="saveMalwareBazaarKey()" class="clay-btn clay-btn-neutral text-xs px-5 py-2">
+                Simpan Key
+              </button>
+            </div>
+            <span id="mb-key-status" class="text-[11px] text-slate-400"></span>
+          </div>
+
+          <!-- YARA Families tags -->
+          <div class="space-y-2">
+            <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Family & Vektor Ancaman Terkover:</label>
+            <div id="intel-families-list" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: FORENSIC FILE INSPECTOR -->
+  <!-- ============================================================= -->
+  <div id="modal-forensic" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="clay-card w-full max-w-4xl p-6 md:p-8 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">🔬</span>
+          <div>
+            <h3 id="modal-file-title" class="text-lg font-black text-white">Inspeksi Forensik Berkas</h3>
+            <p id="modal-file-subtitle" class="text-xs text-slate-400 font-mono">--</p>
+          </div>
+        </div>
+        <button onclick="closeForensicModal()" class="clay-btn clay-btn-neutral text-xs px-3.5 py-1.5">✕ Tutup</button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Entropy Bar -->
+        <div class="clay-card p-4 space-y-2">
+          <div class="flex justify-between text-xs">
+            <span class="text-slate-400 font-bold">Kurva Entropi Shannon per 64-byte:</span>
+            <span id="modal-entropy-val" class="text-cyan-300 font-mono font-bold">--</span>
+          </div>
+          <div id="modal-entropy-bars" class="h-10 clay-inset p-1 rounded-xl flex items-end gap-1"></div>
+        </div>
+
+        <!-- Hex Dump -->
+        <div class="clay-inset p-4 rounded-2xl">
+          <div class="text-[10px] text-slate-400 font-mono font-bold uppercase mb-2">Hex Dump Pratinjau (16 bytes/baris):</div>
+          <pre id="modal-hex-content" class="text-[11px] font-mono text-cyan-300/90 leading-tight max-h-56 overflow-y-auto select-text"></pre>
+        </div>
+
+        <!-- Strings -->
+        <div class="clay-card p-4 space-y-2">
+          <div class="text-xs font-bold text-slate-300 uppercase">String Terdeteksi:</div>
+          <div id="modal-strings-content" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT ENGINE MODULES -->
+  <script src="/static/js/audio.js"></script>
+  <script src="/static/js/forensics_ui.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
+

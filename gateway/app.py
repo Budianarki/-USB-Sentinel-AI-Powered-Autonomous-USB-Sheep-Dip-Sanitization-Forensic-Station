@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from gateway.auth import TokenAuthenticator
 from gateway.limits import BudgetAndRateLimiter, RateLimitExceededError, SpendingCapExceededError
-from gateway.llm import LLMProvider, MockLLMProvider
+from gateway.llm import LLMProvider
 from sentinel.agents.sanitize import sanitize_for_prompt, wrap_untrusted_data
 from sentinel.agents.schemas import (
     AgentRequest,
@@ -37,7 +37,26 @@ app = FastAPI(
 # Shared singletons
 authenticator = TokenAuthenticator()
 limiter = BudgetAndRateLimiter(daily_spending_cap_usd=10.0, max_requests_per_minute=120)
-llm_provider: LLMProvider = MockLLMProvider()
+
+from gateway.providers.factory import get_llm_provider
+
+# Dynamic provider resolution (can be overridden at runtime or reloaded via .env)
+_active_provider: LLMProvider | None = None
+
+
+def get_current_provider() -> LLMProvider:
+    global _active_provider
+    if _active_provider is None:
+        _active_provider = get_llm_provider()
+    return _active_provider
+
+
+def set_current_provider(provider: LLMProvider) -> None:
+    global _active_provider
+    _active_provider = provider
+
+# Alias for backward-compatibility in tests
+llm_provider = get_current_provider()
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
@@ -134,8 +153,9 @@ async def dispatch_agent(
         critique: CritiqueResult | None = None
         report_text: str | None = None
 
+        active_llm = get_current_provider()
         if agent_name in ("static_analyst", "intel"):
-            result_model, tokens_in, tokens_out = await llm_provider.complete_structured(
+            result_model, tokens_in, tokens_out = await active_llm.complete_structured(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_model=AgentVerdict,
@@ -147,7 +167,7 @@ async def dispatch_agent(
                     verdict.file_id = request.file_features.file_id
 
         elif agent_name == "critic":
-            result_model, tokens_in, tokens_out = await llm_provider.complete_structured(
+            result_model, tokens_in, tokens_out = await active_llm.complete_structured(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_model=CritiqueResult,

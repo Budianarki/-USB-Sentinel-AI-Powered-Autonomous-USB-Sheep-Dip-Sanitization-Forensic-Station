@@ -1,0 +1,191 @@
+:root {
+  --clay-bg: #11131b;
+  --clay-surface: #181b26;
+  --clay-surface-light: #202434;
+  --clay-cyan: #06b6d4;
+  --clay-mint: #10b981;
+  --clay-coral: #f43f5e;
+  --clay-amber: #f59e0b;
+  --clay-iris: #6366f1;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: var(--clay-bg);
+  color: #f1f5f9;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.04) 0%, transparent 60%);
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* AUTHENTIC CLAYMORPHISM SURFACES */
+.clay-card {
+  background: linear-gradient(145deg, #1d2130, #151824);
+  border-radius: 28px;
+  box-shadow: 
+    14px 18px 36px rgba(0, 0, 0, 0.55),
+    -6px -6px 20px rgba(255, 255, 255, 0.03),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.12),
+    inset -3px -3px 8px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.clay-card:hover {
+  box-shadow: 
+    18px 24px 44px rgba(0, 0, 0, 0.65),
+    -8px -8px 24px rgba(255, 255, 255, 0.05),
+    inset 2px 2px 5px rgba(255, 255, 255, 0.15),
+    inset -3px -3px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* INSET CLAY WELLS */
+.clay-inset {
+  background: #0d0f17;
+  border-radius: 20px;
+  box-shadow: 
+    inset 6px 6px 14px rgba(0, 0, 0, 0.65),
+    inset -3px -3px 8px rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* TACTILE 3D CLAY BUTTONS */
+.clay-btn {
+  border-radius: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transform: translateY(0);
+}
+
+.clay-btn-cyan {
+  background: linear-gradient(145deg, #06b6d4, #0284c7);
+  color: #041a27;
+  box-shadow: 
+    8px 12px 24px rgba(6, 182, 212, 0.35),
+    -3px -3px 10px rgba(255, 255, 255, 0.15),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.4),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.3);
+}
+.clay-btn-cyan:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    12px 16px 30px rgba(6, 182, 212, 0.45),
+    -4px -4px 14px rgba(255, 255, 255, 0.25),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.45),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.3);
+}
+.clay-btn-cyan:active:not(:disabled) {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 
+    4px 6px 12px rgba(6, 182, 212, 0.3),
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.2);
+}
+
+.clay-btn-clean {
+  background: linear-gradient(145deg, #10b981, #059669);
+  color: #022013;
+  box-shadow: 
+    8px 12px 24px rgba(16, 185, 129, 0.35),
+    -3px -3px 10px rgba(255, 255, 255, 0.15),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.4),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.3);
+}
+.clay-btn-clean:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 12px 16px 30px rgba(16, 185, 129, 0.45);
+}
+.clay-btn-clean:active:not(:disabled) {
+  transform: translateY(2px) scale(0.98);
+}
+
+.clay-btn-danger {
+  background: linear-gradient(145deg, #f43f5e, #be123c);
+  color: #fff;
+  box-shadow: 
+    8px 12px 24px rgba(244, 63, 94, 0.35),
+    -3px -3px 10px rgba(255, 255, 255, 0.15),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.35),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.clay-btn-neutral {
+  background: linear-gradient(145deg, #222738, #181b26);
+  color: #cbd5e1;
+  box-shadow: 
+    6px 8px 18px rgba(0, 0, 0, 0.4),
+    -2px -2px 8px rgba(255, 255, 255, 0.05),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.1),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.clay-btn-neutral:hover {
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.clay-pill {
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 0.72rem;
+  box-shadow: 
+    3px 4px 10px rgba(0, 0, 0, 0.35),
+    -2px -2px 6px rgba(255, 255, 255, 0.04),
+    inset 1px 1px 3px rgba(255, 255, 255, 0.15),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* 3D CLAY USB PORT DOCK */
+.usb-dock {
+  background: linear-gradient(145deg, #191c28, #10121b);
+  border-radius: 24px;
+  box-shadow: 
+    inset 8px 8px 16px rgba(0, 0, 0, 0.7),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.03);
+  padding: 18px;
+  position: relative;
+}
+
+.flashdisk-clay-body {
+  background: linear-gradient(135deg, #f43f5e, #be123c);
+  box-shadow: 
+    6px 8px 16px rgba(0, 0, 0, 0.4),
+    inset 2px 2px 5px rgba(255, 255, 255, 0.3),
+    inset -2px -2px 5px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+}
+
+.flashdisk-clay-connector {
+  background: linear-gradient(135deg, #94a3b8, #475569);
+  box-shadow: inset 1px 1px 3px rgba(255,255,255,0.4), inset -1px -1px 3px rgba(0,0,0,0.5);
+  border-radius: 4px;
+}
+
+/* CUSTOM SCROLLBAR */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f111a;
+}
+::-webkit-scrollbar-thumb {
+  background: #23283a;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #333a52;
+}
+

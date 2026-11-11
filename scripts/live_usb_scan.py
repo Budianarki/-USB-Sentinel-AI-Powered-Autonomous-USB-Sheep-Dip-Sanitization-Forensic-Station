@@ -12,7 +12,6 @@ Scans mounted physical flashdisk, executes:
 
 import asyncio
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -28,7 +27,8 @@ from sentinel.platform.mock_usb import MockUsbSource
 from sentinel.policy.engine import PolicyEngine
 from sentinel.scan.clamav import MockClamAvScanner
 from sentinel.scan.engine import ScanEngine
-from sentinel.scan.yara_scanner import MockYaraScanner
+from sentinel.scan.yara_scanner import MockYaraScanner, YaraScanner
+from sentinel.services.intel_service import IntelService
 from sentinel.store.db import db_session, init_database
 from sentinel.store.hashchain import export_head, verify_hashchain
 from sentinel.util.config import PolicyConfig, SentinelConfig
@@ -37,6 +37,7 @@ from sentinel.util.config import PolicyConfig, SentinelConfig
 async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
     db_file = Path("live_audit.db")
     init_database(db_file)
+    IntelService.seed_offline_feed(db_file)
 
     config = SentinelConfig(mode="laptop_mock")
     config.agents.always_ai = True  # Ensure all candidate files undergo full AI triage
@@ -47,7 +48,8 @@ async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
     indicator = MockIndicator()
 
     clamav = MockClamAvScanner()
-    yara = MockYaraScanner()
+    real_yara = YaraScanner()
+    yara = real_yara if not real_yara.init_error else MockYaraScanner()
     scan_engine = ScanEngine(
         config=config,
         policy_config=policy_config,
@@ -110,7 +112,7 @@ async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
             if row["verdict_json"]:
                 try:
                     verdict_val = json.loads(row["verdict_json"])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     verdict_val = row["verdict_json"]
             agent_runs_data.append({
                 "agent": row["agent"],
@@ -124,7 +126,7 @@ async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
 
     # Retrieve hash chain verification
     chain_valid, event_count, chain_err = verify_hashchain(db_file)
-    head_count, head_hash = export_head(db_file)
+    _head_count, head_hash = export_head(db_file)
 
     # File listing with stats
     scanned_files = []
@@ -140,6 +142,12 @@ async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
                 "av_hits": f.av_hits,
                 "yara_hits": f.yara_hits,
                 "ext_mismatch": f.ext_mismatch,
+                "is_dangerous": bool(
+                    f.av_hits
+                    or f.yara_hits
+                    or f.ext_mismatch
+                    or any(any(k in fl for k in ("macro", "powershell", "autorun", "shortcut", "ransomware", "worm")) for fl in f.flags)
+                ),
             })
 
     report = {
@@ -180,9 +188,9 @@ async def run_live_inspection(mount_dir: Path, output_json: Path) -> dict:
 
 
 if __name__ == "__main__":
-    target = Path("/media/rambo/6DB4-1ABD/sentinel_test_suite")
-    if not target.exists():
-        target = Path("/media/rambo/6DB4-1ABD")
+    import sys
+
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/media/rambo/6DB4-1ABD")
 
     out_file = Path("/tmp/sentinel_live_report.json")
     print(f"[*] Starting live inspection on physical flashdisk: {target}")

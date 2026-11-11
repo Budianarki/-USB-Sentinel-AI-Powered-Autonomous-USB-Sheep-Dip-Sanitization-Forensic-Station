@@ -58,6 +58,9 @@ dmypy.json
 *.sqlite
 *.sqlite3
 *.db
+*.db-wal
+*.db-shm
+*.log
 /data/
 /quarantine/
 .nyxstrike_data/

@@ -6,7 +6,10 @@ In IoT mode:
 
 In laptop_mock mode:
 - MockYaraScanner provides simulated signature detection with prominent [MOCK] labeling.
+- If real YARA is installed and rules are present, real scanning can also be evaluated.
 """
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
@@ -20,6 +23,8 @@ try:
     import yara  # type: ignore[import-untyped,import-not-found]
 except ImportError:
     yara = None
+
+DEFAULT_YARA_RULES_PATH = Path(__file__).parent / "yara_rules" / "index.yar"
 
 
 @dataclass
@@ -36,7 +41,12 @@ class YaraScanner:
     """Production YARA scanner compiling and evaluating YARA rules."""
 
     def __init__(self, rules_path: str | Path | None = None) -> None:
-        self.rules_path = Path(rules_path) if rules_path else None
+        self.rules_path: Path | None = None
+        if rules_path is not None:
+            self.rules_path = Path(rules_path)
+        elif DEFAULT_YARA_RULES_PATH.exists():
+            self.rules_path = DEFAULT_YARA_RULES_PATH
+
         self.compiled_rules: Any = None
         self.init_error: str | None = None
 
@@ -96,13 +106,21 @@ class MockYaraScanner:
         hits: list[str] = []
         lower_data = data.lower()
 
-        # Simulated signatures
+        # Simulated signatures based on MalwareBazaar & vx-underground profiles
+        if b"raspberryrobin" in lower_data or (b"msiexec" in lower_data and b"/q /n -i" in lower_data):
+            hits.append("[MOCK] RaspberryRobin_USB_Worm")
+        if b"lockbit" in lower_data or b"vssadmin delete shadows" in lower_data:
+            hits.append("[MOCK] LockBit_Ransomware_Indicators")
+        if b"redlinestealer" in lower_data or b"encryptedusername" in lower_data:
+            hits.append("[MOCK] RedLine_Stealer_Signatures")
+        if b"ramnit" in lower_data:
+            hits.append("[MOCK] Ramnit_USB_Spreader")
         if b"mimikatz" in lower_data:
             hits.append("[MOCK] Hacktool.Mimikatz.Gen")
         if b"powershell" in lower_data and (
             b"-enc" in lower_data or b"-encodedcommand" in lower_data
         ):
-            hits.append("[MOCK] Suspicious.EncodedPowershell")
+            hits.append("[MOCK] Suspicious_Encoded_PowerShell")
         if b"eval(base64_decode" in lower_data:
             hits.append("[MOCK] WebShell.PhpEvalBase64")
 
